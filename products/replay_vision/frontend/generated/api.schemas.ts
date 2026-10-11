@@ -688,6 +688,14 @@ export interface ScannerResultApi {
     session_duration_s?: number | null
 }
 
+export type PromptValenceEnumApi = (typeof PromptValenceEnumApi)[keyof typeof PromptValenceEnumApi]
+
+export const PromptValenceEnumApi = {
+    Good: 'good',
+    Bad: 'bad',
+    Neutral: 'neutral',
+} as const
+
 /**
  * * `schedule` - Schedule
  * * `on_demand` - On demand
@@ -718,7 +726,6 @@ export interface ReplayObservationLabelApi {
 
 /**
  * * `thumbnail` - Thumbnail
- * * `clip` - Clip
  * * `chapter` - Chapter
  */
 export type ReplayObservationMediaKindEnumApi =
@@ -726,38 +733,26 @@ export type ReplayObservationMediaKindEnumApi =
 
 export const ReplayObservationMediaKindEnumApi = {
     Thumbnail: 'thumbnail',
-    Clip: 'clip',
     Chapter: 'chapter',
 } as const
 
 /**
- * One thumbnail or clip illustrating an observation.
+ * One frame illustrating an observation.
  */
 export interface ReplayObservationMediaApi {
     /** Id of this media entry. */
     readonly id: string
-    /** `thumbnail` for the single frame that illustrates the observation, `chapter` for the frame of one summary chapter, `clip` for a short video.
+    /** `thumbnail` for the single frame that illustrates the observation, `chapter` for the frame of one summary chapter.
      *
      * * `thumbnail` - Thumbnail
-     * * `clip` - Clip
      * * `chapter` - Chapter */
     readonly kind: ReplayObservationMediaKindEnumApi
     /** Order among media of the same kind. For a `chapter` frame, the index into `model_output.chapters`. */
     readonly position: number
     /** Export asset holding the bytes; fetch it from the export content endpoint. */
     readonly asset_id: number
-    /**
-     * One sentence saying what the clip shows. Null for thumbnails.
-     * @nullable
-     */
-    readonly description: string | null
     /** Where this media starts in the analysis video, in milliseconds. */
     readonly video_start_ms: number
-    /**
-     * Where a clip ends in the analysis video, in milliseconds. Null for thumbnails.
-     * @nullable
-     */
-    readonly video_end_ms: number | null
 }
 
 export interface ReplayObservationApi {
@@ -792,6 +787,8 @@ export interface ReplayObservationApi {
      * @nullable
      */
     readonly prompt_question: string | null
+    /** For a monitor or scorer: `good` when a yes or a high score is good news for the team, `bad` when it is a problem, `neutral` when neither. Judged by AI from the prompt. Null for other scanner types, when not judged, or when the prompt has changed since this observation was scanned. */
+    readonly prompt_valence: PromptValenceEnumApi | null
     /** Whether this observation came from the schedule, an on-demand request, a retry of a failed or ineligible observation, or a historical backfill.
      *
      * * `schedule` - Schedule
@@ -830,7 +827,7 @@ export interface ReplayObservationApi {
     readonly label: ReplayObservationLabelApi | null
     /** Whether the calling user has opened this observation. */
     readonly viewed: boolean
-    /** Thumbnails and clips illustrating this observation, in order. Empty until the media render finishes. */
+    /** Frames illustrating this observation, in order. Empty until the media render finishes. */
     readonly media: readonly ReplayObservationMediaApi[]
     /** One line of plain text saying what the scanner found: its verdict, score, tags or title, then its own words, with markdown flattened and the text truncated. An observation that produced no result carries the reason instead, and one still in flight carries an empty string. Read this in place of `scanner_result` when you scan a list of observations. */
     readonly summary_line: string
@@ -1818,6 +1815,17 @@ export interface ScoutReportApi {
     charts: ReportChartApi[]
 }
 
+/**
+ * * `read_only` - Read only
+ * * `support_notes` - Support notes
+ */
+export type ToolPresetEnumApi = (typeof ToolPresetEnumApi)[keyof typeof ToolPresetEnumApi]
+
+export const ToolPresetEnumApi = {
+    ReadOnly: 'read_only',
+    SupportNotes: 'support_notes',
+} as const
+
 export interface SignalScoutSlackDestinationApi {
     /**
      * ID of the Slack integration whose bot posts this scout's findings and reports.
@@ -1909,6 +1917,24 @@ export interface SignalScoutConfigOptionsApi {
      * @maxItems 10
      */
     write_scopes?: string[]
+    /** Opt-in guard on this scout's lifecycle. Off by default, so anyone with scout write access may pause, resume, switch the scout to dry run, or delete it. On, only the person the scout's runs act as or a project admin may do any of those, or change this flag. Use it on a scout whose output people depend on: `signal_scout:write` is a project-wide scope held by people and by unattended agents alike, and a resume has to pass the project's enabled-scout maximum that a pause does not, so a bulk pause is not undone in one step. The lock never stops an automatic pause, such as the inactivity sweep or the repeated-failure breaker. */
+    lifecycle_locked?: boolean
+    /**
+     * Exact MCP tool names selected for this scout, excluding its built-in run context tools. Null means no tool restriction; an empty list selects no additional tools. Write access is derived from selected write tools. Clearing to null preserves the last write scopes. Send this field or tool_preset, never both. Requires the scouts-tool-access feature flag.
+     * @nullable
+     */
+    allowed_mcp_tools?: string[] | null
+    /** Expand this named preset into a saved tool list. Later preset changes do not alter the saved list. Send this field or allowed_mcp_tools, never both. Requires the scouts-tool-access feature flag.
+     *
+     * * `read_only` - Read only
+     * * `support_notes` - Support notes */
+    tool_preset?: ToolPresetEnumApi
+    /**
+     * Optional HogQL `SELECT` a scheduled run evaluates before it starts. When it returns no rows, or one row with one false value (`false`, `0`, null or empty), the run is skipped: no sandbox, no model call, and no run row. Any other result starts the run, and the scout reads the rows. A query error also starts the run. Use `{since}` (the start of the last run that ran, or when the scout was created) and `{now}` to look only at what is new, e.g. `SELECT count() FROM events WHERE event = '$exception' AND timestamp > {since}`. To run at least once a week however quiet it is, add `OR {since} < {now} - INTERVAL 7 DAY` to the condition. Only scheduled runs evaluate it: a manual or workflow run always starts. The query stops after 10 seconds and reads at most 50 rows. Try a query with `scout-config-precheck-test` before you save it. Null or blank turns the pre-check off.
+     * @maxLength 10000
+     * @nullable
+     */
+    precheck_query?: string | null
     /** Whether this scout runs on its schedule. Defaults to true. */
     enabled?: boolean
     /** Whether the scout writes findings to the inbox. False = dry-run: it runs and logs but emits nothing. Defaults to true. */
@@ -2162,6 +2188,23 @@ export interface SignalScoutConfigApi {
      * @maxItems 10
      */
     readonly write_scopes: readonly string[]
+    /** Opt-in guard on this scout's lifecycle. Off by default, so anyone with scout write access may pause, resume, switch the scout to dry run, or delete it. On, only the person the scout's runs act as or a project admin may do any of those, or change this flag. Use it on a scout whose output people depend on: `signal_scout:write` is a project-wide scope held by people and by unattended agents alike, and a resume has to pass the project's enabled-scout maximum that a pause does not, so a bulk pause is not undone in one step. The lock never stops an automatic pause, such as the inactivity sweep or the repeated-failure breaker. */
+    readonly lifecycle_locked: boolean
+    /**
+     * Exact MCP tool names selected for this scout, excluding its built-in run context tools. Null means no tool restriction; an empty list selects no additional tools. Write access is derived from selected write tools. Clearing to null preserves the last write scopes. Send this field or tool_preset, never both. Requires the scouts-tool-access feature flag.
+     * @nullable
+     */
+    readonly allowed_mcp_tools: readonly string[] | null
+    /**
+     * Preset used to select the saved tool list, custom for an explicit list, or null when unrestricted.
+     * @nullable
+     */
+    readonly tool_preset: string | null
+    /**
+     * Optional HogQL `SELECT` a scheduled run evaluates before it starts. When it returns no rows, or one row with one false value (`false`, `0`, null or empty), the run is skipped: no sandbox, no model call, and no run row. Any other result starts the run, and the scout reads the rows. A query error also starts the run. Use `{since}` (the start of the last run that ran, or when the scout was created) and `{now}` to look only at what is new, e.g. `SELECT count() FROM events WHERE event = '$exception' AND timestamp > {since}`. To run at least once a week however quiet it is, add `OR {since} < {now} - INTERVAL 7 DAY` to the condition. Only scheduled runs evaluate it: a manual or workflow run always starts. The query stops after 10 seconds and reads at most 50 rows. Try a query with `scout-config-precheck-test` before you save it. Null or blank turns the pre-check off.
+     * @nullable
+     */
+    readonly precheck_query: string | null
     /**
      * When the coordinator last dispatched this scout. Null if it has never run.
      * @nullable
@@ -2256,6 +2299,11 @@ export interface VariantAnalysisLineApi {
     statement: string
     /** How many of this variant's summaries the analysis read show the theme, as the scout counted them. */
     count: number
+    /**
+     * How many of this variant's summaries the theme was counted over, when that is fewer than the analysis read in total. Null when the theme was counted over every summary the analysis read.
+     * @nullable
+     */
+    read: number | null
     /** Observations of this variant the scout cited for the theme. Ids it can't back are dropped. */
     example_observation_ids: string[]
 }
@@ -2296,6 +2344,11 @@ export interface VariantReadoutApi {
  */
 export type VariantAnalysisDifferenceApiCounts = { [key: string]: number }
 
+/**
+ * Per variant key, how many summaries the theme was counted over, for a theme counted over fewer summaries than the analysis read in total. Empty when it was counted over all of them.
+ */
+export type VariantAnalysisDifferenceApiRead = { [key: string]: number }
+
 export interface VariantAnalysisDifferenceApi {
     /** The theme the difference rests on. */
     theme: string
@@ -2303,6 +2356,8 @@ export interface VariantAnalysisDifferenceApi {
     statement: string
     /** Summaries the analysis read that show the theme, per variant key, as the scout counted them. */
     counts: VariantAnalysisDifferenceApiCounts
+    /** Per variant key, how many summaries the theme was counted over, for a theme counted over fewer summaries than the analysis read in total. Empty when it was counted over all of them. */
+    read: VariantAnalysisDifferenceApiRead
 }
 
 export interface VariantsAnalysisStateApi {
@@ -2676,6 +2731,35 @@ export interface WatchFeedSignalApi {
 }
 
 /**
+ * * `visible_error` - Error on screen
+ * * `silent_failure` - Action silently failed
+ * * `unresponsive` - Clicks went nowhere
+ * * `slow_or_stuck` - Slow or stuck
+ * * `blocked` - Blocked
+ * * `cant_find` - Couldn't find it
+ * * `confused` - Confused
+ * * `workaround` - Took a workaround
+ * * `abandoned` - Gave up
+ * * `churn_signal` - Churn signal
+ * * `success` - Worked well
+ */
+export type JevWatchReasonEnumApi = (typeof JevWatchReasonEnumApi)[keyof typeof JevWatchReasonEnumApi]
+
+export const JevWatchReasonEnumApi = {
+    VisibleError: 'visible_error',
+    SilentFailure: 'silent_failure',
+    Unresponsive: 'unresponsive',
+    SlowOrStuck: 'slow_or_stuck',
+    Blocked: 'blocked',
+    CantFind: 'cant_find',
+    Confused: 'confused',
+    Workaround: 'workaround',
+    Abandoned: 'abandoned',
+    ChurnSignal: 'churn_signal',
+    Success: 'success',
+} as const
+
+/**
  * Machine-readable reason an observation made the feed; the frontend renders the copy.
  */
 export interface WatchFeedReasonApi {
@@ -2727,6 +2811,20 @@ export interface WatchFeedReasonApi {
      * @nullable
      */
     notability_reason?: string | null
+    /** Why the decision model rated the session worth watching, picked from a fixed list, for `jev_watchable`. Absent when no reason on the list fits, or on sessions judged before reasons shipped.
+     *
+     * * `visible_error` - Error on screen
+     * * `silent_failure` - Action silently failed
+     * * `unresponsive` - Clicks went nowhere
+     * * `slow_or_stuck` - Slow or stuck
+     * * `blocked` - Blocked
+     * * `cant_find` - Couldn't find it
+     * * `confused` - Confused
+     * * `workaround` - Took a workaround
+     * * `abandoned` - Gave up
+     * * `churn_signal` - Churn signal
+     * * `success` - Worked well */
+    watch_reason?: JevWatchReasonEnumApi
     /**
      * The observation's score, for `outlier_score`.
      * @nullable
@@ -2781,6 +2879,11 @@ export interface WatchFeedResponseApi {
      * * `weighted-score` - weighted-score
      * * `jev` - jev */
     ranker: RankerEnumApi
+    /**
+     * The team's variant of the `vision-watch-feed-ranker` experiment flag (`control`, `jev-shadow`, `jev`), or null when the team takes no part. Unlike `ranker`, it tells the shadow arm from control. Clients report it on the feed-viewed event as `$feature/vision-watch-feed-ranker`, which is the exposure the experiment counts.
+     * @nullable
+     */
+    ranker_variant: string | null
 }
 
 export type VisionAlertsListParams = {

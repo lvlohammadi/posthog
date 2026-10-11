@@ -14,7 +14,8 @@ export type FeatureFlagsSet = {
  * Whether `posthog-js`-resolved flag values actually reach `featureFlagLogic.featureFlags` (see
  * `spyOnFeatureFlags` below). On self-hosted, non-debug instances they're discarded in favor of
  * the server-configured `PERSISTED_FEATURE_FLAGS` baseline, so anything that enrolls a user into
- * a flag client-side (e.g. early access feature enrollment) has no visible effect there.
+ * a flag client-side (e.g. early access feature enrollment) has no visible effect there. A
+ * self-capturing instance is the exception: its flags come from its own project, not PostHog's.
  */
 export function areClientFeatureFlagsHonored(_preflight: Pick<PreflightStatus, 'cloud' | 'is_debug'> | null): boolean {
     // Self-hosted, single-tenant fork: client-side feature flags are always honored, same as on Cloud.
