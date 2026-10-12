@@ -51,7 +51,6 @@ DEFAULT_TIMEOUT_SECONDS = 30.0
 GATEWAY_MAX_CHOICE_OPTIONS = 16
 GATEWAY_MAX_QUESTIONS = 32
 
-OPENROUTER_HOST = "openrouter.ai"
 OPENROUTER_JEV_MODEL = "typesafe/jev-router"
 # The router can spend reasoning tokens before it writes the JSON answer, so a small cap returns an empty reply.
 CHAT_MAX_TOKENS = 4096
@@ -346,12 +345,12 @@ def _usable_gateway() -> AIGatewayConfig | None:
 
 
 def _usable_openrouter() -> OpenRouterConfig | None:
-    """The chat route, only when ``OPENAI_BASE_URL`` points at OpenRouter, the one host that lists the Jev model."""
+    """The chat route, only when ``OPENAI_BASE_URL`` points at ``OPENROUTER_HOST``, the host that lists the Jev model."""
     base_url, api_key = settings.OPENAI_BASE_URL, settings.OPENAI_API_KEY
     if not (base_url and api_key):
         return None
     parsed = urlparse(base_url)
-    if parsed.scheme != "https" or parsed.hostname != OPENROUTER_HOST:
+    if parsed.scheme != "https" or parsed.hostname != settings.OPENROUTER_HOST:
         return None
     return OpenRouterConfig(url=base_url.rstrip("/"), api_key=api_key)
 
