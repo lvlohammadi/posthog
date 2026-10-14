@@ -630,3 +630,10 @@ Do not write hostnames, IP addresses, ports or account names into tracked files.
   - Also left alone: the sandbox AI gateway per-run dollar caps (they apply only to tokens minted on PostHog's hosted gateway, and no worker here serves those task queues), the new account audit, external account, replay vision observation and heatmap history throttles (API abuse protection, not AI usage), and the Unlayer email editor project id (PostHog's own paid Unlayer project).
   - `docker-compose.base.yml` lost the `CAPTURE_V1_SINK_*` variables on `capture` and `capture-ai`. Remove them from the server copy when the capture image is pulled again.
   - Not built or deployed yet.
+- **2026-10-15, merged upstream `1e9e04933bf` (7 commits) into `master`.** Done as a merge with no conflicts.
+  - All 26 patch checks passed. `ruff --select F821,F811,F401` over the 19 changed Python files passed. The test suite was not run, because the Mac has no PostHog dev environment.
+  - No new throttle, count cap, Cloud-only block or outbound call to a PostHog-owned host in the incoming code, and the whole-tree scan for throttles and caps found no new hit.
+  - Checked and left alone: the agent prompt button now adds a PostHog MCP server hint to the prompt only on Cloud or in dev. The hint tells the external agent to install the MCP server with the PostHog wizard, which targets PostHog's hosted MCP server, so it has no use here. The prompt itself still opens in every agent.
+  - The new in-app delivery of platform alerts carries no cap: `MAX_TITLE_CHARS` only clips the notification title.
+  - No compose change.
+  - Not built or deployed yet.
