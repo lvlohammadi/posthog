@@ -636,4 +636,4 @@ Do not write hostnames, IP addresses, ports or account names into tracked files.
   - Checked and left alone: the agent prompt button now adds a PostHog MCP server hint to the prompt only on Cloud or in dev. The hint tells the external agent to install the MCP server with the PostHog wizard, which targets PostHog's hosted MCP server, so it has no use here. The prompt itself still opens in every agent.
   - The new in-app delivery of platform alerts carries no cap: `MAX_TITLE_CHARS` only clips the notification title.
   - No compose change.
-  - Not built or deployed yet.
+  - Built `sync-20261014-683c6de07ea` (also `:selfhost`, digest `sha256:8502a09dd91b`) on GitHub. The tag carries the UTC date of the build. Not deployed yet.
