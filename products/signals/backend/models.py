@@ -9,9 +9,10 @@ from datetime import datetime, timedelta
 from typing import Any, TypeVar, cast
 
 from django.contrib.postgres.fields import ArrayField
-from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import IntegrityError, connection, models, transaction
+from django.db.models.functions import Upper
 from django.utils import timezone
 from django.utils.functional import Promise
 
@@ -199,6 +200,9 @@ class SignalTeamConfig(ModelActivityMixin, UUIDModel):
     default_autostart_priority = models.CharField(max_length=2, choices=AutonomyPriority, default=AutonomyPriority.P4)
     default_slack_notification_channel = models.CharField(max_length=255, null=True, blank=True)
     autostart_base_branches = models.JSONField(default=dict, blank=True)
+    scout_instructions = models.TextField(null=True, blank=True)
+    research_instructions = models.TextField(null=True, blank=True)
+    implementation_instructions = models.TextField(null=True, blank=True)
     # Daily cap on reports surfacing to the inbox, counted against SignalReport.first_visible_at
     # within the project-timezone day. Once reached, the whole generation pipeline pauses until
     # local midnight (see daily_limit.py). Null means unlimited.
@@ -441,6 +445,10 @@ class SignalReport(UUIDModel):
                 condition=models.Q(first_visible_at__isnull=False),
                 name="signals_report_first_visible",
             ),
+            # Back the inbox `search` filter. On UPPER(...) because icontains compiles to
+            # UPPER(col) LIKE UPPER(pattern) on Postgres.
+            GinIndex(OpClass(Upper("title"), name="gin_trgm_ops"), name="signals_report_title_trgm"),
+            GinIndex(OpClass(Upper("summary"), name="gin_trgm_ops"), name="signals_report_summary_trgm"),
         ]
         constraints = [
             # The barrier itself, not a lookup aid: two emits racing on one key both reach the
@@ -1138,7 +1146,15 @@ class SignalReportSlackThread(UUIDModel):
     A notification invites the reader to reply in the thread and mention PostHog, which starts a
     task. Without this row that task has no way back to the report it discusses, so the work never
     reaches the report's own timeline.
+
+    A scout report row also lets a later delivery of the same report update its message in place
+    instead of posting the report again.
     """
+
+    class Kind(models.TextChoices):
+        INBOX_NOTIFICATION = "inbox_notification", "Inbox notification"
+        SCOUT_REPORT = "scout_report", "Scout report"
+        SCOUT_REPORT_NOTE = "scout_report_note", "Scout report note"
 
     objects = EnvironmentScopedManager()
     all_teams = models.Manager()  # noqa: DJ012
@@ -1155,6 +1171,13 @@ class SignalReportSlackThread(UUIDModel):
     channel = models.CharField(max_length=64)
     # Slack `ts` of the notification message, which is also its thread's root.
     thread_ts = models.CharField(max_length=64)
+    # Null on rows written before the kind was recorded. Those rows never match an in-place update.
+    kind = models.CharField(max_length=32, choices=Kind, null=True, blank=True)
+    # The destination as configured, before Slack resolves it. A member target is a `U…` id here,
+    # while `channel` holds the `D…` direct message that Slack opened for it.
+    target = models.CharField(max_length=64, null=True, blank=True)
+    # Slack `ts` of each threaded reply of a scout report, in summary chunk order.
+    reply_ts = models.JSONField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -2416,6 +2439,14 @@ class SignalReportCheck(UUIDModel):
 #   - SignalScoutNote:   steering notes humans/agents leave for scouts to read.
 
 
+def default_scout_write_scopes() -> list[str]:
+    from posthog.temporal.oauth import (  # noqa: PLC0415 — keeps the token module off the models import path
+        SCOUT_DEFAULT_WRITE_SCOPES,
+    )
+
+    return sorted(SCOUT_DEFAULT_WRITE_SCOPES)
+
+
 class SignalScoutConfig(ModelActivityMixin, TeamScopedRootMixin, UUIDModel):
     """One row per (team, scout skill): schedule + emit posture for a scout skill.
 
@@ -2717,16 +2748,17 @@ class SignalScoutConfig(ModelActivityMixin, TeamScopedRootMixin, UUIDModel):
         db_default=[],
         blank=True,
     )
-    # User-facing write scopes a person granted this one scout, on top of the fleet-wide posture
-    # every scout carries. Plain scope strings (`["dashboard:write", "insight:write"]`), so adding
-    # a grantable object later is one allowlist entry rather than a new column. Empty means the
-    # scout reads the project and writes only what the fleet grants every scout.
+    # User-facing write scopes this one scout holds, on top of the fleet-wide posture every scout
+    # carries. Plain scope strings (`["dashboard:write", "insight:write"]`), so adding a grantable
+    # object later is one allowlist entry rather than a new column. A new row starts with
+    # `SCOUT_DEFAULT_WRITE_SCOPES`. Empty means the scout reads the project and writes only its own
+    # findings and memory.
     # Validated against `SCOUT_GRANTABLE_WRITE_SCOPES` at the API boundary and intersected against
     # it again when a run's token is minted, so a stored grant cannot widen a token past the
     # allowlist. Deliberately NOT excluded from activity logging, and gated in the config API to the
     # scout's acting user and project admins: this field decides what an unattended agent may change
     # in the project. A dry run (`emit=False`) ignores it, so a preview never mutates the project.
-    write_scopes = models.JSONField(default=list, db_default=[])
+    write_scopes = models.JSONField(default=default_scout_write_scopes, db_default=[])
     # Opt-in guard on the lifecycle fields (`enabled`, `emit`, deletion, and this flag). Off by
     # default, so the fleet keeps the plain `signal_scout:write` bar. On, only the scout's
     # resolved acting user or a project admin may pause, resume, switch to dry run, or delete it
@@ -2754,8 +2786,11 @@ class SignalScoutConfig(ModelActivityMixin, TeamScopedRootMixin, UUIDModel):
     # Optional HogQL query a scheduled run evaluates before it starts (`scout_harness/precheck.py`).
     # No rows, or a single false value, skips the run, so a scout that watches something rare can
     # run often and pay for a sandbox only when there is something new. `{since}` and `{now}` are
-    # bound as HogQL placeholders. Null turns the pre-check off.
+    # bound as HogQL placeholders, and `{interval_minutes}` is the scout's schedule interval. Null
+    # falls back to the default its canonical skill ships, if any (`scout-precheck-query`).
     precheck_query = models.TextField(null=True, blank=True)
+    # Turns off both `precheck_query` and the skill default, so every due tick runs the scout.
+    precheck_disabled = models.BooleanField(default=False, db_default=False)
     # Stamped by the coordinator after each dispatch; drives the due-check. Written every
     # run, so it is excluded from activity logging (see field_exclusions below).
     last_run_at = models.DateTimeField(null=True, blank=True)
