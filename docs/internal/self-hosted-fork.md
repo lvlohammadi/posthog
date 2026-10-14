@@ -421,8 +421,28 @@ Run every command in this section from the repo root on the Mac, with `master` c
 
 ## Building the image
 
-The image is built on the Mac and pushed to Docker Hub.
-The VM only pulls it.
+The image is pushed to Docker Hub, and the VM only pulls it.
+Build it on GitHub when you can, and on the Mac as the fallback.
+
+### On GitHub
+
+The `<github-user>/posthog-selfhost-build` repository holds one workflow, "Build self-hosted image".
+It checks out this fork at the ref you give it, builds `Dockerfile` natively for `linux/amd64`, and pushes the `selfhost` tag and a dated `sync-YYYYMMDD-<commit>` tag.
+
+- It runs only when started by hand, so upstream changes never start a run or send a notification.
+- GitHub Actions stays switched off on this fork. Turning it on would start the upstream workflows on every sync push, including new ones that no setting can disable in advance.
+- The builder repository needs the `DOCKERHUB_USERNAME` variable and the `DOCKERHUB_TOKEN` secret, a Docker Hub access token with read and write access.
+- No build secret is passed, so the Dockerfile's source map upload to PostHog never runs.
+
+```bash
+gh workflow run build-image.yml -R <github-user>/posthog-selfhost-build -f ref=master
+```
+
+```bash
+gh run watch -R <github-user>/posthog-selfhost-build
+```
+
+### On the Mac
 
 1. Docker Desktop needs at least 8 CPUs and 12 GB of memory (Settings, Resources).
    Its 1 CPU and 1 GB default cannot build this image.
