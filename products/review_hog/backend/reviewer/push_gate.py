@@ -42,6 +42,7 @@ from typing import Any, Literal
 import requests
 from redis.exceptions import RedisError
 
+from posthog.cloud_utils import is_cloud
 from posthog.dataclasses import frozen
 from posthog.egress.github.transport import GitHubRateLimitError
 from posthog.llm.system_one import NoulAnswer, NoulQuestion, SystemOneNotConfigured, SystemOneRequestFailed
@@ -515,7 +516,8 @@ def apply_throttle(decision: PushGateDecision, *, report_id: str, head_sha: str)
     A head pays once. A failed turn runs again as a new activity or a new child workflow, and a
     retry that charged again could find the bucket empty and drop a review that passed the budget.
     """
-    if decision.skip:
+    # Self-hosted, single-tenant fork: automatic follow-up reviews have no per-PR budget off Cloud.
+    if decision.skip or not is_cloud():
         return decision
     paid_key = f"reviewhog_push_budget_paid:{report_id}:{head_sha}"
     client = get_client()

@@ -18,6 +18,7 @@ import posthoganalytics
 
 from posthog.schema import AlertCalculationInterval, DetectorType
 
+from posthog.cloud_utils import is_cloud
 from posthog.dataclasses import frozen
 from posthog.exceptions_capture import capture_exception
 
@@ -133,6 +134,9 @@ def admit_llm_alert_write(write: LLMAlertWrite) -> LLMAlertRefusal | None:
     ):
         return LLMAlertRefusal(message=error, reason="access")
     if not write.adds_enabled_llm_alert:
+        return None
+    # Self-hosted, single-tenant fork: the number of AI-detector alerts is never capped off Cloud.
+    if not is_cloud():
         return None
     # The cap is a flag read that can go to the network; resolve it before the lock so a slow
     # flag service never holds the team's other AI-alert writes, or the rows the caller locked.

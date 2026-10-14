@@ -2911,6 +2911,11 @@ def _is_actions_block(block: Any) -> bool:
 class TestLLMDetectorValidation(TrendsInsightAPITest):
     def setUp(self):
         super().setUp()
+        # The fork lifts the AI alert cap and the simulation throttle off Cloud, so these run as Cloud.
+        for target in ("products.alerts.backend.llm_detector_limits.is_cloud", "posthog.rate_limit.is_cloud"):
+            cloud = mock.patch(target, return_value=True)
+            cloud.start()
+            self.addCleanup(cloud.stop)
         self.insight = self.create_trends_insight(interval="day")
 
     def _create_breakdown_insight(self) -> dict[str, Any]:

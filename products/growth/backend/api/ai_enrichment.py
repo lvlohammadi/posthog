@@ -38,6 +38,7 @@ from posthog.helpers.impersonation import is_impersonated
 from posthog.llm.gateway_client import get_llm_client
 from posthog.models import User
 from posthog.permissions import IsStaffUser
+from posthog.rate_limit import UnlimitedOffCloudThrottle
 from posthog.renderers import SafeJSONRenderer
 
 from products.growth.backend.api.ai_enrichment_serializers import (
@@ -125,7 +126,7 @@ class NDJSONRenderer(renderers.BaseRenderer):
         return json.dumps(data).encode()
 
 
-class AIEnrichmentRunThrottle(UserRateThrottle):
+class AIEnrichmentRunThrottle(UnlimitedOffCloudThrottle, UserRateThrottle):
     """The global throttles are PersonalApiKeyRateThrottle subclasses, which pass straight through
     for a session-authenticated request with no personal API key - so this endpoint would otherwise
     have no limit at all. Each allowed call can cost up to MAX_SAMPLE_SIZE LLM completions."""

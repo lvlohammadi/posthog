@@ -376,7 +376,10 @@ def test_push_gate_throttles_the_third_push_in_half_an_hour(empty_redis: None) -
     ]
     start = datetime(2026, 10, 14, 12, 0, tzinfo=UTC)
     outcomes = []
-    with time_machine.travel(start, tick=False) as clock:
+    with (
+        patch("products.review_hog.backend.reviewer.push_gate.is_cloud", return_value=True),
+        time_machine.travel(start, tick=False) as clock,
+    ):
         for minutes, report_id, head_sha, decision in pushes:
             clock.move_to(start + timedelta(minutes=minutes))
             result = apply_throttle(decision, report_id=report_id, head_sha=head_sha)

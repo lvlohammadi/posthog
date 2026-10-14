@@ -98,8 +98,9 @@ class TestDraftCustomManifest(APIBaseTest):
         # A failure must surface as an error, never as a canned 200 manifest.
         self.assertNotIn("manifest_json", response.json())
 
+    @patch("posthog.rate_limit.is_cloud", return_value=True)
     @patch("posthog.rate_limit.is_rate_limit_enabled", return_value=True)
-    def test_throttled_per_team_after_burst_limit(self, _enabled) -> None:
+    def test_throttled_per_team_after_burst_limit(self, _enabled, _cloud) -> None:
         self._approve_ai()
         self._reset_throttles()
         other = Team.objects.create(organization=self.organization, name="Other")

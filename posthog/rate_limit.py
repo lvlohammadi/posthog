@@ -15,7 +15,7 @@ from django.utils import timezone
 
 from prometheus_client import Counter
 from rest_framework import exceptions
-from rest_framework.throttling import SimpleRateThrottle, UserRateThrottle
+from rest_framework.throttling import BaseThrottle, SimpleRateThrottle, UserRateThrottle
 from statshog.defaults.django import statsd
 
 if TYPE_CHECKING:
@@ -809,6 +809,15 @@ class ExportCreateSustainedRateThrottle(_TeamBucketRateThrottle):
     rate = "600/hour"
 
 
+class UnlimitedOffCloudThrottle(BaseThrottle):
+    """Self-hosted, single-tenant fork: a throttle that caps model calls never fires off Cloud."""
+
+    def allow_request(self, request, view):
+        if not is_cloud():
+            return True
+        return super().allow_request(request, view)
+
+
 class _AIThrottleBase(UserRateThrottle):
     action_name: str
 
@@ -911,32 +920,32 @@ def is_team_exempt_from_ai_rate_limit(team_id: int) -> bool:
     return team_id in exempt_team_ids
 
 
-class LLMProxyBurstRateThrottle(UserRateThrottle):
+class LLMProxyBurstRateThrottle(UnlimitedOffCloudThrottle, UserRateThrottle):
     scope = "llm_proxy_burst"
     rate = "2/minute"
 
 
-class LLMProxySustainedRateThrottle(UserRateThrottle):
+class LLMProxySustainedRateThrottle(UnlimitedOffCloudThrottle, UserRateThrottle):
     scope = "llm_proxy_sustained"
     rate = "10/hour"
 
 
-class LLMProxyDailyRateThrottle(UserRateThrottle):
+class LLMProxyDailyRateThrottle(UnlimitedOffCloudThrottle, UserRateThrottle):
     scope = "llm_proxy_daily"
     rate = "20/day"
 
 
-class LLMProxyBYOKBurstRateThrottle(UserRateThrottle):
+class LLMProxyBYOKBurstRateThrottle(UnlimitedOffCloudThrottle, UserRateThrottle):
     scope = "llm_proxy_byok_burst"
     rate = "30/minute"
 
 
-class LLMProxyBYOKSustainedRateThrottle(UserRateThrottle):
+class LLMProxyBYOKSustainedRateThrottle(UnlimitedOffCloudThrottle, UserRateThrottle):
     scope = "llm_proxy_byok_sustained"
     rate = "500/hour"
 
 
-class LLMProxyBYOKDailyRateThrottle(UserRateThrottle):
+class LLMProxyBYOKDailyRateThrottle(UnlimitedOffCloudThrottle, UserRateThrottle):
     scope = "llm_proxy_byok_daily"
     rate = "2000/day"
 
@@ -967,17 +976,17 @@ class AIObservabilityTextReprSustainedThrottle(PersonalApiKeyRateThrottle):
     rate = "600/hour"
 
 
-class AIObservabilityTranslationBurstThrottle(PersonalApiKeyRateThrottle):
+class AIObservabilityTranslationBurstThrottle(UnlimitedOffCloudThrottle, PersonalApiKeyRateThrottle):
     scope = "llm_analytics_translation_burst"
     rate = "30/minute"
 
 
-class AIObservabilityTranslationSustainedThrottle(PersonalApiKeyRateThrottle):
+class AIObservabilityTranslationSustainedThrottle(UnlimitedOffCloudThrottle, PersonalApiKeyRateThrottle):
     scope = "llm_analytics_translation_sustained"
     rate = "200/hour"
 
 
-class AIObservabilityTranslationDailyThrottle(PersonalApiKeyRateThrottle):
+class AIObservabilityTranslationDailyThrottle(UnlimitedOffCloudThrottle, PersonalApiKeyRateThrottle):
     # Daily cap for LLM-powered translation endpoint
     # Hard limit to prevent runaway costs
     scope = "llm_analytics_translation_daily"
@@ -994,21 +1003,21 @@ class AIObservabilitySentimentSustainedThrottle(PersonalApiKeyRateThrottle):
     rate = "600/hour"
 
 
-class AIObservabilitySummarizationBurstThrottle(PersonalApiKeyOrUserRateThrottle):
+class AIObservabilitySummarizationBurstThrottle(UnlimitedOffCloudThrottle, PersonalApiKeyOrUserRateThrottle):
     # Rate limit for LLM-powered summarization endpoint
     # Conservative limits to control OpenAI API costs
     scope = "llm_analytics_summarization_burst"
     rate = "50/minute"
 
 
-class AIObservabilitySummarizationSustainedThrottle(PersonalApiKeyOrUserRateThrottle):
+class AIObservabilitySummarizationSustainedThrottle(UnlimitedOffCloudThrottle, PersonalApiKeyOrUserRateThrottle):
     # Rate limit for LLM-powered summarization endpoint
     # Conservative limits to control OpenAI API costs
     scope = "llm_analytics_summarization_sustained"
     rate = "200/hour"
 
 
-class AIObservabilitySummarizationDailyThrottle(PersonalApiKeyOrUserRateThrottle):
+class AIObservabilitySummarizationDailyThrottle(UnlimitedOffCloudThrottle, PersonalApiKeyOrUserRateThrottle):
     # Daily cap for LLM-powered summarization endpoint
     # Hard limit to prevent runaway costs
     scope = "llm_analytics_summarization_daily"
@@ -1049,7 +1058,7 @@ class AIObservabilityBackfillCreateSustainedThrottle(_TeamBucketRateThrottle):
     rate = "100/hour"
 
 
-class _CustomSourceAIBuilderThrottle(PersonalApiKeyOrUserRateThrottle):
+class _CustomSourceAIBuilderThrottle(UnlimitedOffCloudThrottle, PersonalApiKeyOrUserRateThrottle):
     """Per-team throttle for the (paid, Opus-backed) custom-source AI manifest builder.
 
     One drafting request fans out to several Opus calls and isn't billed to the customer, so the
@@ -1769,7 +1778,7 @@ def _is_llm_alert_simulation(request) -> bool:
     return isinstance(detector_config, dict) and detector_config.get("type") == "llm"
 
 
-class _AlertLLMSimulationThrottle(PersonalApiKeyOrUserRateThrottle):
+class _AlertLLMSimulationThrottle(UnlimitedOffCloudThrottle, PersonalApiKeyOrUserRateThrottle):
     """Per-team cap on billable AI alert simulations.
 
     Keyed per team so extra API keys or members do not multiply it, and applied to every

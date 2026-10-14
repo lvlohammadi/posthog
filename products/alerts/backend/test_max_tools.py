@@ -429,6 +429,7 @@ class TestUpsertAlertTool(BaseTest):
         with (
             mock.patch.object(UpsertAlertTool, "check_object_access", new=disable_after_read),
             mock.patch("products.alerts.backend.llm_detector_limits.max_llm_alerts_per_team", return_value=1),
+            mock.patch("products.alerts.backend.llm_detector_limits.is_cloud", return_value=True),
         ):
             content, artifact = await tool._arun_impl(
                 action=UpdateAlertAction(alert_id=str(disabled.id), enabled=True, lower_threshold=5.0)
