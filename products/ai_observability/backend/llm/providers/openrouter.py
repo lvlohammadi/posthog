@@ -8,6 +8,7 @@ import logging
 from collections.abc import Generator
 from typing import Any
 
+from django.conf import settings
 from django.core.cache import cache
 
 import httpx
@@ -24,8 +25,9 @@ from products.ai_observability.backend.llm.types import (
 
 logger = logging.getLogger(__name__)
 
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_DECISIONS_BASE_URL = "https://openrouter.ai/api/alpha"
+# Self-hosted, single-tenant fork: calls go to OPENROUTER_HOST, so a proxy in front of OpenRouter serves them.
+OPENROUTER_BASE_URL = f"https://{settings.OPENROUTER_HOST}/api/v1"
+OPENROUTER_DECISIONS_BASE_URL = f"https://{settings.OPENROUTER_HOST}/api/alpha"
 
 # For App Attribution
 OPENROUTER_HEADERS = {
@@ -142,7 +144,7 @@ class OpenRouterAdapter(OpenAIAdapter):
 
         try:
             response = httpx.get(
-                "https://openrouter.ai/api/v1/auth/key",
+                f"{OPENROUTER_BASE_URL}/auth/key",
                 headers={"Authorization": f"Bearer {api_key}"},
                 timeout=OpenAIConfig.TIMEOUT,
             )
