@@ -648,4 +648,5 @@ Do not write hostnames, IP addresses, ports or account names into tracked files.
   - The project settings help text for the workflow task caps still names the Cloud defaults. Leaving the field empty means no cap here.
   - No compose change.
   - Built `sync-20261015-6cba1e1c8cc` (also `:selfhost`, digest `sha256:b8f53971dbea`) on GitHub. Not deployed yet.
-- **2026-10-15, fork change outside a sync.** Added row 22 after an audit of direct AI provider calls. Every other model client reads its endpoint from `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL` or `GOOGLE_GEMINI_BASE_URL`. Hosts still hardcoded, and why they stay: TypeSafe (off without `TYPESAFE_API_KEY`), Inkeep docs search (off without `INKEEP_API_KEY`), the Rust embedding worker and `services/llm-gateway` (not deployed). Not built or deployed yet.
+- **2026-10-15, fork change outside a sync.** Added row 22 after an audit of direct AI provider calls. Every other model client reads its endpoint from `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL` or `GOOGLE_GEMINI_BASE_URL`. Hosts still hardcoded, and why they stay: TypeSafe (off without `TYPESAFE_API_KEY`), Inkeep docs search (off without `INKEEP_API_KEY`), the Rust embedding worker and `services/llm-gateway` (not deployed).
+  - Built `sync-20261015-4f40514f349` (also `:selfhost`, digest `sha256:8644bd0ee6a7`) on GitHub. Not deployed yet.
