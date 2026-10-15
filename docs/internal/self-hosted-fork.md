@@ -646,4 +646,4 @@ Do not write hostnames, IP addresses, ports or account names into tracked files.
   - Checked and left alone: the trace summarization concurrency default (20 teams at once, bounds worker load), the Business knowledge semantic search document cap (bounds one ClickHouse query), the new usage counter comparison in quota limiting (Cloud billing only), and the new `DATA_COLOR_THEMES` and replay retention feature checks in the team serializer (covered by patch #1).
   - The project settings help text for the workflow task caps still names the Cloud defaults. Leaving the field empty means no cap here.
   - No compose change.
-  - Not built or deployed yet.
+  - Built `sync-20261015-6cba1e1c8cc` (also `:selfhost`, digest `sha256:b8f53971dbea`) on GitHub. Not deployed yet.
