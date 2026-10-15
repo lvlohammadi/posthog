@@ -354,8 +354,9 @@ class TestWorkflowTasksAPI(APIBaseTest):
         assert response.status_code == status.HTTP_201_CREATED, response.json()
 
     @parameterized.expand(["per_workflow", "team_wide"])
+    @patch("products.tasks.backend.logic.services.workflow_tasks.is_cloud", return_value=True)
     @patch("products.tasks.backend.logic.services.workflow_tasks.usage_limit_response")
-    def test_skips_creation_at_the_daily_cap(self, scope: str, usage_limit_response_mock) -> None:
+    def test_skips_creation_at_the_daily_cap(self, scope: str, usage_limit_response_mock, _is_cloud_mock) -> None:
         if scope == "per_workflow":
             self._seed_created_tasks(WORKFLOW_TASK_RATE_CAP_PER_DAY, hog_flow_id=UUID(self.hog_flow.id))
             expected_fragment = "This workflow reached its daily limit"

@@ -16,6 +16,7 @@ from django.utils import timezone as django_timezone
 
 import structlog
 
+from posthog.cloud_utils import is_cloud
 from posthog.dataclasses import frozen
 from posthog.models import User
 from posthog.models.integration import Integration, SlackIntegration
@@ -202,15 +203,17 @@ def create_workflow_task(
         observe_workflow_task_create(reason="replayed")
         return replay
 
+    # Self-hosted, single-tenant fork: the default daily caps apply only on Cloud.
+    # A cap the project sets still applies.
     workflow_rate_cap = (
         rate_limits.per_workflow
         if rate_limits is not None and rate_limits.per_workflow is not None
-        else WORKFLOW_TASK_RATE_CAP_PER_DAY
+        else (WORKFLOW_TASK_RATE_CAP_PER_DAY if is_cloud() else None)
     )
     team_rate_cap = (
         rate_limits.per_team
         if rate_limits is not None and rate_limits.per_team is not None
-        else WORKFLOW_TASK_TEAM_RATE_CAP_PER_DAY
+        else (WORKFLOW_TASK_TEAM_RATE_CAP_PER_DAY if is_cloud() else None)
     )
 
     gateway_server_ids = resolve_connectors(team.id, connector_ids)
@@ -227,10 +230,10 @@ def create_workflow_task(
         observe_workflow_task_create(reason="owner_ineligible")
         raise WorkflowTaskOwnerIneligible()
     daily_counts = _daily_task_counts(team.id, hog_flow_id)
-    if daily_counts.workflow >= workflow_rate_cap:
+    if workflow_rate_cap is not None and daily_counts.workflow >= workflow_rate_cap:
         observe_workflow_task_create(reason="rate_capped")
         raise WorkflowTaskRateCapped(workflow_rate_cap)
-    if daily_counts.team >= team_rate_cap:
+    if team_rate_cap is not None and daily_counts.team >= team_rate_cap:
         observe_workflow_task_create(reason="team_rate_capped")
         raise WorkflowTaskTeamRateCapped(team_rate_cap)
 
@@ -305,10 +308,10 @@ def create_workflow_task(
             # create could have pushed the count over the cap since then. This locked
             # read is the one that decides.
             daily_counts = _daily_task_counts(team.id, hog_flow_id)
-            if daily_counts.workflow >= workflow_rate_cap:
+            if workflow_rate_cap is not None and daily_counts.workflow >= workflow_rate_cap:
                 observe_workflow_task_create(reason="rate_capped")
                 raise WorkflowTaskRateCapped(workflow_rate_cap)
-            if daily_counts.team >= team_rate_cap:
+            if team_rate_cap is not None and daily_counts.team >= team_rate_cap:
                 observe_workflow_task_create(reason="team_rate_capped")
                 raise WorkflowTaskTeamRateCapped(team_rate_cap)
 

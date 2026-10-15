@@ -9,6 +9,7 @@ from django.db.models import Count
 
 import structlog
 
+from posthog.cloud_utils import is_cloud
 from posthog.models.activity_logging.activity_log import Change, Detail, log_activity
 from posthog.models.activity_logging.model_activity import get_current_user, get_was_impersonated
 from posthog.models.scoping import with_team_scope
@@ -117,7 +118,8 @@ def create_library(team_id: int, name: str) -> KnowledgeLibrary:
     cleaned = _clean_name(name)
     with transaction.atomic():
         _lock_libraries(team_id)
-        if KnowledgeLibrary.objects.filter(team_id=team_id).count() >= MAX_LIBRARIES_PER_TEAM:
+        # Self-hosted, single-tenant fork: a project may have any number of libraries.
+        if is_cloud() and KnowledgeLibrary.objects.filter(team_id=team_id).count() >= MAX_LIBRARIES_PER_TEAM:
             raise LibraryRejected({"name": f"This project already has {MAX_LIBRARIES_PER_TEAM} libraries."})
         if KnowledgeLibrary.objects.filter(team_id=team_id, name__iexact=cleaned).exists():
             raise LibraryRejected({"name": "A library with this name already exists."})
@@ -353,7 +355,7 @@ def ensure_default_library(team_id: int) -> KnowledgeLibrary | None:
             named.is_default = True
             named.save(update_fields=["is_default", "updated_at"])
             return named
-        if KnowledgeLibrary.objects.filter(team_id=team_id).count() >= MAX_LIBRARIES_PER_TEAM:
+        if is_cloud() and KnowledgeLibrary.objects.filter(team_id=team_id).count() >= MAX_LIBRARIES_PER_TEAM:
             # A learned document must still land. It stays unfiled until a library is removed.
             logger.warning("business_knowledge.default_library_skipped_at_cap", team_id=team_id)
             return None
