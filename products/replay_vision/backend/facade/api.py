@@ -185,8 +185,8 @@ def start_workflow_observation_request(
     inline: WorkflowInlineScan | None,
     idempotency_key: str,
     wait_for_session_end: bool,
-    per_workflow_daily_cap: int,
-    per_team_daily_cap: int,
+    per_workflow_daily_cap: int | None,
+    per_team_daily_cap: int | None,
 ) -> StartedObservationRequest:
     """Scan one session for a workflow step, with a saved scanner or an inline scan of any type.
 

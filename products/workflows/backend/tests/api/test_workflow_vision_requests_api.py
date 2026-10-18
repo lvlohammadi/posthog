@@ -39,6 +39,11 @@ def _token(team_id: int, hog_flow_id: str, *, audience: PosthogJwtAudience) -> s
 class TestWorkflowVisionRequestsAPI(APIBaseTest):
     def setUp(self) -> None:
         super().setUp()
+        cloud_patcher = patch(
+            "products.workflows.backend.presentation.views.workflow_vision_requests.is_cloud", return_value=True
+        )
+        cloud_patcher.start()
+        self.addCleanup(cloud_patcher.stop)
         self.client.logout()
         self.hog_flow = HogFlow.objects.create(
             team=self.team, name="Churn review", created_by=self.user, trigger={"type": "manual"}

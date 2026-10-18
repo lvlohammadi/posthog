@@ -116,6 +116,9 @@ class TestSubscriptionTemporal(APILicensedTest):
         self.mock_temporal_client.start_workflow = AsyncMock()
         self.mock_sync.return_value = self.mock_temporal_client
         self.addCleanup(self._sync_connect_patcher.stop)
+        cloud_patcher = patch("products.subscriptions.backend.presentation.views.is_cloud", return_value=True)
+        cloud_patcher.start()
+        self.addCleanup(cloud_patcher.stop)
 
     @pytest.mark.skip_on_multitenancy
     def test_free_org_can_list_subscriptions_without_license(self):

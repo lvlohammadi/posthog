@@ -52,6 +52,7 @@ from posthog.api.forbid_destroy_model import ForbidDestroyModel
 from posthog.api.ordering import StableOrderingFilter
 from posthog.api.routing import TeamAndOrgViewSetMixin
 from posthog.api.shared import UserBasicSerializer
+from posthog.cloud_utils import is_cloud
 from posthog.constants import SUBSCRIPTION_AI_PROMPT_FEATURE_FLAG_KEY
 from posthog.dataclasses import frozen
 from posthog.event_usage import AnalyticsProps, get_request_analytics_properties, groups
@@ -1035,6 +1036,9 @@ class SubscriptionWriteSerializer(serializers.ModelSerializer):
         # Already-on subscriptions stay on for grandfathered orgs already over
         # the cap; the becoming-active check in validate() ensures we only get
         # here when the row is transitioning into the active-summary state.
+        # Self-hosted, single-tenant fork: the active AI summary cap applies only on Cloud.
+        if not is_cloud():
+            return
         limit = get_organization_limit(
             organization=organization,
             key=LimitKey.MAX_ACTIVE_AI_SUMMARIES_PER_ORG,
@@ -1956,9 +1960,14 @@ class SubscriptionViewSet(TeamAndOrgViewSetMixin, ForbidDestroyModel, viewsets.M
             return Response(cached)
 
         active_count = _count_active_summaries(organization)
-        limit = get_organization_limit(
-            organization=organization,
-            key=LimitKey.MAX_ACTIVE_AI_SUMMARIES_PER_ORG,
+        # Self-hosted, single-tenant fork: the active AI summary cap applies only on Cloud.
+        limit = (
+            get_organization_limit(
+                organization=organization,
+                key=LimitKey.MAX_ACTIVE_AI_SUMMARIES_PER_ORG,
+            )
+            if is_cloud()
+            else None
         )
         payload = {
             "active_count": active_count,

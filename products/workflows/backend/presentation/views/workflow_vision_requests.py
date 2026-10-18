@@ -11,6 +11,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from posthog.auth import InternalAPIUser
+from posthog.cloud_utils import is_cloud
 
 from products.replay_vision.backend.facade.api import (
     MAX_SESSION_ID_LENGTH,
@@ -155,6 +156,10 @@ class WorkflowVisionRequestViewSet(viewsets.GenericViewSet):
             return _rejected("Workflow no longer exists.", status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         limits = get_workflow_vision_scan_daily_limits(team_id=team_id)
+        # Self-hosted, single-tenant fork: the default daily caps apply only on Cloud.
+        # A cap the project sets still applies.
+        default_workflow_cap = WORKFLOW_SCAN_RATE_CAP_PER_DAY if is_cloud() else None
+        default_team_cap = WORKFLOW_SCAN_TEAM_RATE_CAP_PER_DAY if is_cloud() else None
         try:
             scanner_id, inline = parse_workflow_scan_setup(data["setup"])
             started = start_workflow_observation_request(
@@ -166,10 +171,8 @@ class WorkflowVisionRequestViewSet(viewsets.GenericViewSet):
                 inline=inline,
                 idempotency_key=data["idempotency_key"],
                 wait_for_session_end=data["wait_for_session_end"],
-                per_workflow_daily_cap=WORKFLOW_SCAN_RATE_CAP_PER_DAY
-                if limits.per_workflow is None
-                else limits.per_workflow,
-                per_team_daily_cap=WORKFLOW_SCAN_TEAM_RATE_CAP_PER_DAY if limits.per_team is None else limits.per_team,
+                per_workflow_daily_cap=default_workflow_cap if limits.per_workflow is None else limits.per_workflow,
+                per_team_daily_cap=default_team_cap if limits.per_team is None else limits.per_team,
             )
         except ObservationRequestRejected as error:
             logger.info(

@@ -107,8 +107,9 @@ class IdempotencyKeyConflict(Exception):
 class WorkflowScanCaps:
     """The most scan requests one workflow, and all of a project's workflows, may make in 24 hours."""
 
-    per_workflow: int
-    per_team: int
+    # None means no cap.
+    per_workflow: int | None
+    per_team: int | None
 
 
 class WorkflowScanCapReached(Exception):
@@ -234,9 +235,9 @@ def _check_workflow_caps(team_id: int, hog_flow_id: str, caps: WorkflowScanCaps)
         .using(_WRITER)
         .filter(source=ObservationRequestSource.WORKFLOW, created_at__gte=timezone.now() - timedelta(days=1))
     )
-    if recent.filter(reference=hog_flow_id).count() >= caps.per_workflow:
+    if caps.per_workflow is not None and recent.filter(reference=hog_flow_id).count() >= caps.per_workflow:
         raise WorkflowScanCapReached("workflow", caps.per_workflow)
-    if recent.count() >= caps.per_team:
+    if caps.per_team is not None and recent.count() >= caps.per_team:
         raise WorkflowScanCapReached("team", caps.per_team)
 
 
