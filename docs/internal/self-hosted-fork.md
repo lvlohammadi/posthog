@@ -673,4 +673,4 @@ Do not write hostnames, IP addresses, ports or account names into tracked files.
   - New migrations: 3 in `posthog`, 2 in `ee` (dashboard collaborators move to access control and `DashboardPrivilege` is removed), and one or two in 20 products. `products/data_modeling` drops the `datawarehousemodelpath` table, and the subscription models move to the new `products/subscriptions` app. No ClickHouse migration.
   - Removed settings: `ELEVENLABS_API_KEY`, `ELEVENLABS_API_BASE_URL`, `ELEVENLABS_VOICE_ID` and `ELEVENLABS_TTS_MODEL_ID`. New optional settings for warehouse imports and LLM evaluation backfills, all with defaults.
   - No compose change.
-  - Not deployed yet.
+  - Built `sync-20261020-f17b2ff3226` (also `:selfhost`, digest `sha256:d6019fcefff5`) on GitHub. The build watcher lost its connection to the GitHub API, but the run finished green. Not deployed yet.
