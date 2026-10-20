@@ -1698,12 +1698,12 @@ class SubscriptionTestDeliveryThrottle(PersonalApiKeyOrUserRateThrottle):
             return self.cache_format % {"scope": self.scope, "ident": f"team_{team_id}"}
 
 
-class ContextSelectionBurstThrottle(_TeamBucketRateThrottle):
+class ContextSelectionBurstThrottle(UnlimitedOffCloudThrottle, _TeamBucketRateThrottle):
     scope = "context_selection_burst"
     rate = "30/minute"
 
 
-class ContextSelectionSustainedThrottle(_TeamBucketRateThrottle):
+class ContextSelectionSustainedThrottle(UnlimitedOffCloudThrottle, _TeamBucketRateThrottle):
     scope = "context_selection_sustained"
     rate = "300/hour"
 

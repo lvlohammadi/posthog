@@ -1264,11 +1264,13 @@ class TestSelectionThrottleAPI(NonAtomicAPIBaseTest):
             ("sustained", ContextSelectionSustainedThrottle, "1/hour"),
         ]
     )
+    @patch("posthog.rate_limit.is_cloud", return_value=True)
     def test_selection_rate_limit_covers_sandbox_oauth(
         self,
         name: str,
         throttle: type[ContextSelectionBurstThrottle | ContextSelectionSustainedThrottle],
         rate: str,
+        _is_cloud: MagicMock,
     ) -> None:
         task = apps.get_model("tasks", "Task").objects.create(
             team=self.team, created_by=self.user, title="Question", origin_product="posthog_ai"

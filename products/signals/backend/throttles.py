@@ -3,7 +3,7 @@ from typing import Any
 from rest_framework.request import Request
 from rest_framework.throttling import UserRateThrottle
 
-from posthog.rate_limit import PersonalApiKeyOrUserRateThrottle
+from posthog.rate_limit import PersonalApiKeyOrUserRateThrottle, UnlimitedOffCloudThrottle
 
 
 class ReportMetricRefreshThrottle(PersonalApiKeyOrUserRateThrottle):
@@ -17,13 +17,13 @@ class ReportMetricRefreshThrottle(PersonalApiKeyOrUserRateThrottle):
         return super().get_cache_key(request, view)
 
 
-class ReportTaskActionRunBurstThrottle(UserRateThrottle):
+class ReportTaskActionRunBurstThrottle(UnlimitedOffCloudThrottle, UserRateThrottle):
     # Scope and rate match the tasks create throttle for report tasks, so a run started from the
     # API spends the same per-user budget as one started from the inbox.
     scope = "signal_report_task_create_burst"
     rate = "10/hour"
 
 
-class ReportTaskActionRunSustainedThrottle(UserRateThrottle):
+class ReportTaskActionRunSustainedThrottle(UnlimitedOffCloudThrottle, UserRateThrottle):
     scope = "signal_report_task_create_day"
     rate = "30/day"

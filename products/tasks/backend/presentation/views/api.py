@@ -56,7 +56,7 @@ from posthog.permissions import (
     get_authenticator_scopes,
     is_mcp_built_in_agent_oauth_request,
 )
-from posthog.rate_limit import TaskRunChartRenderThrottle
+from posthog.rate_limit import TaskRunChartRenderThrottle, UnlimitedOffCloudThrottle
 from posthog.renderers import ServerSentEventRenderer
 from posthog.schema_migrations.upgrade import upgrade
 from posthog.security.outbound_proxy import internal_requests_session
@@ -482,12 +482,12 @@ class _SignalReportTaskThrottle(UserRateThrottle):
         return super().allow_request(request, view)
 
 
-class SignalReportTaskCreateBurstThrottle(_SignalReportTaskThrottle):
+class SignalReportTaskCreateBurstThrottle(UnlimitedOffCloudThrottle, _SignalReportTaskThrottle):
     scope = "signal_report_task_create_burst"
     rate = "10/hour"
 
 
-class SignalReportTaskCreateSustainedThrottle(_SignalReportTaskThrottle):
+class SignalReportTaskCreateSustainedThrottle(UnlimitedOffCloudThrottle, _SignalReportTaskThrottle):
     scope = "signal_report_task_create_day"
     rate = "30/day"
 

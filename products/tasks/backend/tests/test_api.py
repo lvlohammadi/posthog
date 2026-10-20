@@ -3564,7 +3564,8 @@ class TestTaskAPI(BaseTaskAPITest):
         mock_workflow.assert_not_called()
         self.assertFalse(TaskRun.objects.filter(task=task, status=TaskRun.Status.QUEUED).exists())
 
-    def test_discussion_task_cap_per_report_counts_free_form_labels(self):
+    @patch("products.signals.backend.task_run_artefacts.is_cloud", return_value=True)
+    def test_discussion_task_cap_per_report_counts_free_form_labels(self, _is_cloud):
         from products.signals.backend.models import SignalReport
         from products.signals.backend.task_run_artefacts import MAX_DISCUSSION_TASKS_PER_REPORT
 
@@ -3631,7 +3632,8 @@ class TestTaskAPI(BaseTaskAPITest):
         task.refresh_from_db()
         self.assertFalse(task.internal)
 
-    def test_signal_report_create_throttle_skips_other_origins(self):
+    @patch("posthog.rate_limit.is_cloud", return_value=True)
+    def test_signal_report_create_throttle_skips_other_origins(self, _is_cloud):
         from products.signals.backend.models import SignalReport
         from products.tasks.backend.presentation.views.api import SignalReportTaskCreateBurstThrottle
 

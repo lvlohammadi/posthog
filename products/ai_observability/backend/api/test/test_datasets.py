@@ -791,7 +791,10 @@ class TestDatasetsApi(APIBaseTest):
             connection.check_constraints([DatasetItemVersion._meta.db_table])
 
     def test_dataset_limit_counts_archived_datasets(self) -> None:
-        with patch("products.ai_observability.backend.dataset_service.MAX_DATASETS_PER_TEAM", 1):
+        with (
+            patch("products.ai_observability.backend.dataset_service.MAX_DATASETS_PER_TEAM", 1),
+            patch("products.ai_observability.backend.dataset_service.is_cloud", return_value=True),
+        ):
             dataset = self._create_dataset()
             self.client.post(f"{self.datasets_url}{dataset['id']}/archive/")
             response = self.client.post(self.datasets_url, {"name": "Over the limit"}, format="json")
@@ -858,6 +861,7 @@ class TestDatasetsApi(APIBaseTest):
 
         with (
             patch("products.ai_observability.backend.dataset_service.MAX_DATASETS_PER_TEAM", 1),
+            patch("products.ai_observability.backend.dataset_service.is_cloud", return_value=True),
             patch(
                 "products.ai_observability.backend.dataset_service.posthoganalytics.get_feature_flag_payload",
                 side_effect=record_payload_transaction_depth,

@@ -19,6 +19,8 @@ from enum import StrEnum
 
 from django.db import transaction
 
+from posthog.cloud_utils import is_cloud
+
 from products.signals.backend.artefact_schemas import (
     SIGNALS_PRODUCT,
     TASK_RUN_TYPE_DISCUSSION,
@@ -263,6 +265,9 @@ def enforce_report_task_cap(
 
         if is_pull_request_run_request(description) and active_pull_request_run(team_id=team_id, report_id=report_id):
             raise ReportTaskCapExceeded(kind=TASK_RUN_TYPE_DISCUSSION, detail=PULL_REQUEST_RUN_ACTIVE_DETAIL)
+    if not is_cloud():
+        # Self-hosted, single-tenant fork: a report may have any number of AI discussions.
+        return
     # Any non-implementation label is a discussion for cap purposes; server-only pipeline labels
     # can't reach here (the write serializer rejects them) and are excluded from the count.
     # Counting is status-independent: a discussion that ended still consumed inference.

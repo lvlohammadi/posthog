@@ -11,6 +11,7 @@ from django.db.models import Max
 
 import posthoganalytics
 
+from posthog.cloud_utils import is_cloud
 from posthog.exceptions_capture import capture_exception
 from posthog.models import Team, User
 
@@ -453,7 +454,8 @@ def create_dataset(
     with connection.cursor() as cursor:
         cursor.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", [f"aio-dataset-allocation:{team.id}"])
     current_count = Dataset.objects.for_team(team.id, canonical=True).count()
-    if current_count >= max_datasets:
+    # Self-hosted, single-tenant fork: a project may have any number of datasets.
+    if is_cloud() and current_count >= max_datasets:
         raise DatasetLimitExceeded(
             resource="datasets",
             current_count=current_count,
