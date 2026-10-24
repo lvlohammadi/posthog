@@ -190,6 +190,10 @@ _DATABASE_NOT_FOUND_VALIDATION_ERROR = (
     "correct and try again."
 )
 
+# The source type the managed-warehouse host exemption is keyed on. It names the listener
+# set the exemption applies to, and both the validation and the connect path pass it.
+POSTGRES_HOST_CHECK_SOURCE_TYPE = "postgres"
+
 PostgresErrors = {
     "password authentication failed for user": _INVALID_CREDENTIALS_VALIDATION_ERROR,
     # A proxy/pooler in front of some providers rejects bad credentials during its own
@@ -1572,6 +1576,22 @@ class PostgresSource(
                 "division in that column or view definition (for example with a CASE or NULLIF), or "
                 "remove it from the sync, then re-enable the sync."
             ),
+            # A view or computed column in the customer's own schema calls a PL/pgSQL function that
+            # enforces its own access check and raises a custom RAISE EXCEPTION when it finds no
+            # user context — commonly a Supabase helper keyed off auth.uid(), which Supabase's
+            # PostgREST layer populates per-request but a direct database connection like ours never
+            # sets. We only ever run `SELECT ... FROM <relation>`; the check lives in the customer's
+            # own function and runs on every row, so it fails identically on every retry. Match the
+            # stable guard message and exclude the volatile CONTEXT line naming the function and
+            # line number.
+            "Access denied: No user ID provided": (
+                "A view or column you're syncing calls a function in your database that checks for "
+                'a signed-in user and rejects the read when none is present ("Access denied: No '
+                'user ID provided"). This usually means the function depends on request-scoped auth '
+                "context (for example Supabase's auth.uid()) that a direct database connection like "
+                "PostHog's never has. Update the function to allow the connecting role through, or "
+                "remove the affected view or column from the sync, then re-enable the sync."
+            ),
         }
 
     def get_retryable_errors(self) -> set[str]:
@@ -1969,7 +1989,11 @@ class PostgresSource(
             return False, _RAILWAY_INTERNAL_HOST_ERROR
 
         valid_host, host_errors = self.is_database_host_valid(
-            config.host, team_id, using_ssh_tunnel=self.ssh_tunnel_enabled(config)
+            config.host,
+            team_id,
+            using_ssh_tunnel=self.ssh_tunnel_enabled(config),
+            port=config.port,
+            source_type=POSTGRES_HOST_CHECK_SOURCE_TYPE,
         )
         if not valid_host:
             return valid_host, host_errors
