@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from posthog.api.routing import TeamAndOrgViewSetMixin
 from posthog.api.scoped_related_fields import TeamScopedPrimaryKeyRelatedField
 from posthog.api.shared import UserBasicSerializer
+from posthog.cloud_utils import is_cloud
 from posthog.event_usage import report_user_action
 from posthog.exceptions import as_drf_validation_error
 from posthog.models.team.team import Team
@@ -402,7 +403,8 @@ class VisionAlertConfigurationSerializer(serializers.ModelSerializer):
             # Locking the team row serialises concurrent creates for this team so the
             # per-team cap can't be raced past.
             team = Team.objects.select_for_update().get(id=validated_data["team_id"])
-            if validated_data["team_id"] not in UNCAPPED_ALERT_TEAM_IDS:
+            # Self-hosted, single-tenant fork: the per-team alert cap applies only on Cloud.
+            if is_cloud() and validated_data["team_id"] not in UNCAPPED_ALERT_TEAM_IDS:
                 count = VisionAlertConfiguration.objects.for_team(validated_data["team_id"]).count()
                 if count >= MAX_ALERTS_PER_TEAM:
                     raise ValidationError(f"Maximum number of alerts ({MAX_ALERTS_PER_TEAM}) reached for this team.")
@@ -629,7 +631,8 @@ class VisionAlertViewSet(TeamAndOrgViewSetMixin, viewsets.ModelViewSet):
                 team_id=self.team_id, alert_id=str(alert.id), allowed_event_ids=VISION_ALERT_EVENT_IDS
             )
             event_kinds = self._event_kinds_for(alert)
-            if existing + len(event_kinds) > MAX_DESTINATIONS_PER_ALERT * len(event_kinds):
+            # Self-hosted, single-tenant fork: the per-alert destination cap applies only on Cloud.
+            if is_cloud() and existing + len(event_kinds) > MAX_DESTINATIONS_PER_ALERT * len(event_kinds):
                 raise ValidationError(
                     f"Maximum number of destinations ({MAX_DESTINATIONS_PER_ALERT}) reached for this alert."
                 )

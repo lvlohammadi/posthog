@@ -283,7 +283,10 @@ class TestVisionAlertControlPlane(_VisionAlertAPITestCase):
         assert body["consecutive_failures"] == 0
 
     def test_alert_cap_enforced(self) -> None:
-        with patch("products.replay_vision.backend.api.vision_alerts.MAX_ALERTS_PER_TEAM", 1):
+        with (
+            patch("products.replay_vision.backend.api.vision_alerts.is_cloud", return_value=True),
+            patch("products.replay_vision.backend.api.vision_alerts.MAX_ALERTS_PER_TEAM", 1),
+        ):
             self._create_via_api()
             response = self.client.post(self.base_url, self._metric_payload(name="Second"), format="json")
             assert response.status_code == 400

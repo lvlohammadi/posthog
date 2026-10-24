@@ -118,7 +118,7 @@ class TestSubscriptionTemporal(APILicensedTest):
         self.mock_temporal_client.start_workflow = AsyncMock()
         self.mock_sync.return_value = self.mock_temporal_client
         self.addCleanup(self._sync_connect_patcher.stop)
-        cloud_patcher = patch("products.subscriptions.backend.presentation.views.is_cloud", return_value=True)
+        cloud_patcher = patch("products.subscriptions.backend.logic.summary_quota.is_cloud", return_value=True)
         cloud_patcher.start()
         self.addCleanup(cloud_patcher.stop)
 
@@ -2978,7 +2978,7 @@ class TestSubscriptionFreeTierAccess(APILicensedTest):
 
 @patch("products.subscriptions.backend.logic.subscription_writes.sync_connect")
 @patch("products.subscriptions.backend.logic.subscription_writes.posthoganalytics.feature_enabled", return_value=True)
-@patch("products.subscriptions.backend.logic.subscription_writes.is_cloud", return_value=True)
+@patch("products.subscriptions.backend.logic.summary_quota.is_cloud", return_value=True)
 class TestAISubscriptionAPI(APILicensedTest):
     def _enable_ai(self):
         self.organization.is_ai_data_processing_approved = True
@@ -4347,7 +4347,7 @@ class TestSubscriptionObjectAccessControl(APILicensedTest):
         dashboard = self._dashboard_with_tiles(self.open_insight, self.restricted_insight)
 
         with (
-            patch("products.subscriptions.backend.logic.subscription_writes.is_cloud", return_value=True),
+            patch("products.subscriptions.backend.logic.summary_quota.is_cloud", return_value=True),
             patch(
                 "products.subscriptions.backend.logic.subscription_writes.posthoganalytics.feature_enabled",
                 return_value=True,

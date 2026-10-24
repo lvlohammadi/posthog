@@ -6,6 +6,7 @@ from django.core.cache import cache
 
 import posthoganalytics
 
+from posthog.cloud_utils import is_cloud
 from posthog.models.organization import Organization
 from posthog.resource_limits import LimitKey, get_organization_limit
 
@@ -46,9 +47,14 @@ def summary_quota(organization: Organization) -> SummaryQuota:
         return SummaryQuota(active_count=cached["active_count"], limit=cached["limit"], at_limit=cached["at_limit"])
 
     active_count = count_active_summaries(organization)
-    limit = get_organization_limit(
-        organization=organization,
-        key=LimitKey.MAX_ACTIVE_AI_SUMMARIES_PER_ORG,
+    # Self-hosted, single-tenant fork: the active AI summary cap applies only on Cloud.
+    limit = (
+        get_organization_limit(
+            organization=organization,
+            key=LimitKey.MAX_ACTIVE_AI_SUMMARIES_PER_ORG,
+        )
+        if is_cloud()
+        else None
     )
     at_limit = limit is not None and active_count >= limit
     payload = {
@@ -66,6 +72,9 @@ def validate_summary_enabled_org_limit(
     # Already-on subscriptions stay on for grandfathered orgs already over
     # the cap; the becoming-active check in validate() ensures we only get
     # here when the row is transitioning into the active-summary state.
+    # Self-hosted, single-tenant fork: the active AI summary cap applies only on Cloud.
+    if not is_cloud():
+        return
     limit = get_organization_limit(
         organization=organization,
         key=LimitKey.MAX_ACTIVE_AI_SUMMARIES_PER_ORG,

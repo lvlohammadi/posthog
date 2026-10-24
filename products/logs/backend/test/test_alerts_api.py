@@ -716,7 +716,10 @@ class TestLogsAlertAPI(APIBaseTest):
             )
 
         patched_ids = frozenset({self.team.id}) if uncapped else frozenset()
-        with patch("products.logs.backend.alert_creation.UNCAPPED_ALERT_TEAM_IDS", patched_ids):
+        with (
+            patch("products.logs.backend.alert_creation.is_cloud", return_value=True),
+            patch("products.logs.backend.alert_creation.UNCAPPED_ALERT_TEAM_IDS", patched_ids),
+        ):
             response = self.client.post(
                 self.base_url,
                 self._valid_payload(name="Boundary"),
@@ -2559,7 +2562,10 @@ class TestLogsAlertAPI(APIBaseTest):
             else None
         )
 
-        with patch("products.logs.backend.alert_creation.MAX_ALERTS_PER_TEAM", cap if cap is not None else 20):
+        with (
+            patch("products.logs.backend.alert_creation.is_cloud", return_value=True),
+            patch("products.logs.backend.alert_creation.MAX_ALERTS_PER_TEAM", cap if cap is not None else 20),
+        ):
             response = self._create_on_the_platform(body, team_id=environment.id if environment else None)
 
         assert response.status_code == expected, response.json()

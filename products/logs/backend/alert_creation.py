@@ -6,6 +6,7 @@ from typing import Any
 
 from django.db import connection
 
+from posthog.cloud_utils import is_cloud
 from posthog.models.team.team import Team
 
 from products.logs.backend.alert_utils import next_allowed_check_at
@@ -32,7 +33,8 @@ def claim_alert_slot(team_id: int) -> None:
     `AlertLimitReached` when the team is at its cap."""
     with connection.cursor() as cursor:
         cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", [f"logs_alerts:{team_id}"])
-    if team_id in UNCAPPED_ALERT_TEAM_IDS:
+    # Self-hosted, single-tenant fork: the per-team alert cap applies only on Cloud.
+    if not is_cloud() or team_id in UNCAPPED_ALERT_TEAM_IDS:
         return
     if LogsAlertConfiguration.objects.filter(team_id=team_id).count() >= MAX_ALERTS_PER_TEAM:
         raise AlertLimitReached()

@@ -49,6 +49,11 @@ class TestConversionRecommendations(APIBaseTest):
         self.addCleanup(self.flags.stop)
         self.organization.is_ai_data_processing_approved = True
         self.organization.save(update_fields=["is_ai_data_processing_approved"])
+        cloud = patch(
+            "products.marketing_analytics.backend.services.conversion_recommendations.is_cloud", return_value=True
+        )
+        cloud.start()
+        self.addCleanup(cloud.stop)
         self.worker_flags = patch(
             "products.marketing_analytics.backend.services.conversion_recommendations.feature_enabled_or_false",
             return_value=True,

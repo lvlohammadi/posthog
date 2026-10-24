@@ -11,6 +11,7 @@ from prometheus_client import Counter
 from pydantic import BaseModel, ConfigDict, Field
 
 from posthog.api.statement_timeout import statement_timeout
+from posthog.cloud_utils import is_cloud
 from posthog.models import Team, User
 from posthog.models.team.extensions import get_or_create_team_extension
 from posthog.models.team.team_marketing_analytics_config import TeamMarketingAnalyticsConfig
@@ -207,8 +208,10 @@ class ConversionRecommendationService:
             if latest and (
                 not refresh
                 or latest.status in ACTIVE_STATUSES
+                # Self-hosted, single-tenant fork: the rescan cooldown applies only on Cloud.
                 or (
-                    latest.status == ConversionRecommendationRun.Status.COMPLETED
+                    is_cloud()
+                    and latest.status == ConversionRecommendationRun.Status.COMPLETED
                     and now < (latest.completed_at or latest.created_at) + SCAN_COOLDOWN
                 )
             ):

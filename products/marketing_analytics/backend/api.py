@@ -61,7 +61,7 @@ from posthog.models.team.team import DEFAULT_CURRENCY, Team
 from posthog.models.team.team_marketing_analytics_config import TeamMarketingAnalyticsConfig
 from posthog.models.user import User
 from posthog.ph_client import feature_enabled_or_false
-from posthog.rate_limit import ClickHouseBurstRateThrottle, ClickHouseSustainedRateThrottle
+from posthog.rate_limit import ClickHouseBurstRateThrottle, ClickHouseSustainedRateThrottle, UnlimitedOffCloudThrottle
 
 from products.marketing_analytics.backend.hogql_queries.adapters.base import ExternalConfig, QueryContext
 from products.marketing_analytics.backend.hogql_queries.adapters.factory import MarketingSourceFactory
@@ -518,7 +518,7 @@ class ConversionRecommendationStateSerializer(serializers.Serializer):
     )
 
 
-class ConversionRecommendationThrottle(UserRateThrottle):
+class ConversionRecommendationThrottle(UnlimitedOffCloudThrottle, UserRateThrottle):
     scope = "marketing_conversion_recommendations"
     rate = "5/hour"
 
