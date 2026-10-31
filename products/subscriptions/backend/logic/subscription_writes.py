@@ -18,7 +18,8 @@ from posthog.schema import SubscriptionAIContextLimit
 from posthog.constants import SUBSCRIPTION_AI_PROMPT_FEATURE_FLAG_KEY
 from posthog.event_usage import AnalyticsProps, groups
 from posthog.exceptions_capture import capture_exception
-from posthog.models.integration import Integration, SlackIntegration
+from posthog.integrations import IntegrationManager, IntegrationNotFound
+from posthog.models.integration import SlackIntegration
 from posthog.models.organization import Organization
 from posthog.models.team import Team
 from posthog.models.user import User
@@ -466,14 +467,10 @@ class _SubscriptionWrite:
                     {"integration_id": ["A Slack integration is required for Slack subscriptions."]}
                 )
             try:
-                integration = Integration.objects.get(id=integration_id, team_id=self.team_id)
-            except Integration.DoesNotExist:
+                integration = IntegrationManager.slack.oauth.get(self.team_id, integration_id)
+            except IntegrationNotFound:
                 raise SubscriptionRequestInvalidError(
                     {"integration_id": ["This integration does not exist or does not belong to your team."]}
-                )
-            if integration.kind != "slack":
-                raise SubscriptionRequestInvalidError(
-                    {"integration_id": ["Slack subscriptions require a Slack integration."]}
                 )
             if gallery_enabled and SlackIntegration(integration).missing_scopes({"files:write"}):
                 raise SubscriptionRequestInvalidError(
