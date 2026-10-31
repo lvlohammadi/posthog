@@ -6,6 +6,7 @@ from uuid import UUID
 
 from django.db import transaction
 
+from posthog.cloud_utils import is_cloud
 from posthog.models.team.team import Team
 from posthog.models.user import User
 
@@ -94,7 +95,8 @@ def ask_playground_chat(*, chat: PlaygroundChat, team: Team, user_id: int, quest
             and PlaygroundTurn.objects.for_team(chat.team_id).filter(chat=chat, task_id__in=open_task_ids).exists()
         ):
             raise SandboxRunInProgress()
-        if len(open_task_ids) >= MAX_OPEN_RUNS_PER_OWNER:
+        # Self-hosted, single-tenant fork: the per-person cap on open runs applies only on Cloud.
+        if is_cloud() and len(open_task_ids) >= MAX_OPEN_RUNS_PER_OWNER:
             raise SandboxRunLimitReached()
 
     def record_turn(created: CreatedTaskDTO) -> None:

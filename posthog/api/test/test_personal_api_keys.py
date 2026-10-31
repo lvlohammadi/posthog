@@ -129,7 +129,8 @@ class TestPersonalAPIKeysAPI(APIBaseTest):
         assert response.json()["description"] is None
 
     @parameterized.expand([(None, 10), (12, 12)])
-    def test_create_too_many_api_keys(self, entitlement_limit: int | None, expected_limit: int):
+    @patch("posthog.models.personal_api_key.is_cloud", return_value=True)
+    def test_create_too_many_api_keys(self, entitlement_limit: int | None, expected_limit: int, _is_cloud):
         if entitlement_limit is not None:
             self.organization.available_product_features = [
                 {"key": AvailableFeature.PERSONAL_API_KEYS, "name": "Personal API keys", "limit": entitlement_limit}
@@ -153,7 +154,8 @@ class TestPersonalAPIKeysAPI(APIBaseTest):
             "attr": None,
         }
 
-    def test_personal_api_key_limit_is_the_highest_entitlement_across_organizations(self):
+    @patch("posthog.models.personal_api_key.is_cloud", return_value=True)
+    def test_personal_api_key_limit_is_the_highest_entitlement_across_organizations(self, _is_cloud):
         other_organization = Organization.objects.create(name="Other organization")
         other_organization.members.add(self.user)
 

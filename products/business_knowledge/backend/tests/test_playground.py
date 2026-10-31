@@ -70,7 +70,8 @@ class TestPlaygroundChatAPI(APIBaseTest):
         assert self.client.get(other_url).status_code == status.HTTP_404_NOT_FOUND
         assert PlaygroundChat.objects.unscoped().filter(id=chat["id"]).exists()
 
-    def test_one_open_answer_per_chat_while_other_chats_run(self, _ff, _workflow) -> None:
+    @patch("products.business_knowledge.backend.playground.is_cloud", return_value=True)
+    def test_one_open_answer_per_chat_while_other_chats_run(self, _is_cloud, _ff, _workflow) -> None:
         first = self._create_chat()
         started = self.client.post(f"{self.url}{first['id']}/ask/", {"question": "Can I get a refund?"}, format="json")
         assert started.status_code == status.HTTP_201_CREATED, started.content

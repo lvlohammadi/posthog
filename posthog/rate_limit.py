@@ -1005,13 +1005,13 @@ class AIObservabilitySummarizationDailyThrottle(UnlimitedOffCloudThrottle, Perso
     rate = "500/day"
 
 
-class InsightExplainBurstThrottle(PersonalApiKeyOrUserRateThrottle):
+class InsightExplainBurstThrottle(UnlimitedOffCloudThrottle, PersonalApiKeyOrUserRateThrottle):
     # A decision model call costs a small fraction of a summarization call, so it gets its own, higher limits.
     scope = "insight_explain_burst"
     rate = "120/minute"
 
 
-class InsightExplainDailyThrottle(PersonalApiKeyOrUserRateThrottle):
+class InsightExplainDailyThrottle(UnlimitedOffCloudThrottle, PersonalApiKeyOrUserRateThrottle):
     scope = "insight_explain_daily"
     rate = "5000/day"
 

@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from prometheus_client import Counter
 
+from posthog.cloud_utils import is_cloud
 from posthog.constants import AvailableFeature
 from posthog.migration_helpers import deprecate_field
 from posthog.models.activity_logging.model_activity import ModelActivityMixin
@@ -81,6 +82,9 @@ def max_personal_api_keys_for_user(user: "User") -> int:
     A key is not bound to one organization, so the highest `personal_api_keys` limit across the
     user's organizations applies. Organizations without a numeric limit grant the default.
     """
+    # Self-hosted, single-tenant fork: a user may hold any number of personal API keys.
+    if not is_cloud():
+        return 2**31 - 1
     org_features = user.organization_memberships.values_list("organization__available_product_features", flat=True)
     limits = [
         feature.get("limit")

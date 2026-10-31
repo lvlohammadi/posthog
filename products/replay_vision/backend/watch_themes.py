@@ -20,6 +20,7 @@ from asgiref.sync import sync_to_async
 from google.genai import types
 from pydantic import BaseModel, Field
 
+from posthog.cloud_utils import is_cloud
 from posthog.dataclasses import frozen
 from posthog.models.utils import uuid7
 
@@ -213,7 +214,8 @@ def _reserve_naming_budget(team_id: int, now: datetime) -> bool:
     """Take one naming from the project's daily budget in a single increment, so concurrent callers never overshoot."""
     key = _naming_budget_key(team_id, now)
     cache.add(key, 0, timeout=2 * 24 * 3600)
-    if cache.incr(key) <= THEME_NAMING_DAILY_CAP:
+    # Self-hosted, single-tenant fork: the daily naming cap applies only on Cloud.
+    if cache.incr(key) <= THEME_NAMING_DAILY_CAP or not is_cloud():
         return True
     _refund_naming_budget(team_id, now)
     return False
