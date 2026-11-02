@@ -878,6 +878,7 @@ SPECTACULAR_SETTINGS = {
             "ConversationsRecentTicketsWidgetTypeEnum": ["conversations_recent_tickets"],
             "CanvasAppWidgetTypeEnum": ["canvas_app"],
             "MetricsTableWidgetTypeEnum": ["metrics_table"],
+            "MetricsWidgetTypeEnum": ["metrics"],
         }
     ),
 }
