@@ -575,6 +575,9 @@ sudo rm -f /data/backups/pre-deploy.dump && sudo docker image prune -f
   ```bash
   cd /root && sudo docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --no-deps --force-recreate proxy
   ```
+- **Docker Hub serves some layers from CloudFront.** A host that can reach only the Cloudflare download host fails on those layers with a timeout. Copy the tag to `ghcr.io` with the `mirror-ghcr.yml` workflow in the builder repo, pull it there, and tag it with the name the compose file uses. The same trick covers `quay.io` images.
+- **A compose update needs the whole bundle.** The server compose files are copies, so a sync that changes them also changes mounted files in the checkout, the image tags, and sometimes `.env`. Dry-run in the live folder (a different folder changes every container's hash), refresh the Rust images, keep the pins that protect this VM, and read each new container's first log lines.
+- **Stop the stack before a reboot.** `docker compose stop -t 180` gives ClickHouse, Postgres and Kafka time to exit cleanly. A stop with the default 10 seconds can kill them. Services with `restart: unless-stopped` stay stopped after the reboot, so run `up -d` afterwards.
 
 ## Operational notes
 
