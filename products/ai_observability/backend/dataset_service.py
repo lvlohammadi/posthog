@@ -8,6 +8,7 @@ from uuid import UUID
 
 from django.db import IntegrityError, connection, transaction
 from django.db.models import Max
+from django.utils import timezone
 
 import posthoganalytics
 
@@ -18,6 +19,7 @@ from posthog.models import Team, User
 
 from products.ai_observability.backend.dataset_limits import MAX_DATASET_ITEM_PAYLOAD_BYTES, MAX_ITEMS_PER_DATASET
 from products.ai_observability.backend.dataset_queries import latest_dataset_revision
+from products.ai_observability.backend.dataset_retention import DatasetUsage
 from products.ai_observability.backend.models.datasets import Dataset, DatasetItem, DatasetItemVersion, DatasetRevision
 
 type JSONValue = None | bool | int | float | str | list[JSONValue] | dict[str, JSONValue]
@@ -258,7 +260,7 @@ def _lock_dataset(*, team_id: int, dataset_id: UUID) -> Dataset:
         Dataset.objects.for_team(team_id, canonical=True)
         .select_for_update(of=("self",))
         .select_related("current_revision")
-        .get(id=dataset_id)
+        .get(id=dataset_id, expired_at__isnull=True)
     )
     current_revision = dataset.current_revision
     if current_revision is None:
@@ -331,6 +333,10 @@ def _check_base_version(*, current_version: DatasetItemVersion, base_version: in
 
 
 def _create_revision(*, dataset: Dataset, created_by: User | None) -> DatasetRevision:
+    if dataset.current_revision_id is not None:
+        DatasetRevision.objects.for_team(dataset.team_id, canonical=True).filter(id=dataset.current_revision_id).update(
+            last_used_at=timezone.now()
+        )
     latest_revision_number = (
         DatasetRevision.objects.for_team(dataset.team_id, canonical=True)
         .filter(dataset_id=dataset.id)
@@ -405,7 +411,8 @@ def _create_item_version(
     item.current_version = version
     item.save(update_fields=["current_version", "updated_at"])
     dataset.current_revision = revision
-    dataset.save(update_fields=["current_revision", "updated_at"])
+    dataset.last_used_at = timezone.now()
+    dataset.save(update_fields=["current_revision", "updated_at", "last_used_at"])
     return version
 
 
@@ -460,7 +467,7 @@ def create_dataset(
     normalized_name = _validate_dataset_fields(name=name, description=description, metadata=normalized_metadata)
     with connection.cursor() as cursor:
         cursor.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", [f"aio-dataset-allocation:{team.id}"])
-    current_count = Dataset.objects.for_team(team.id, canonical=True).count()
+    current_count = Dataset.objects.for_team(team.id, canonical=True).filter(expired_at__isnull=True).count()
     # Self-hosted, single-tenant fork: a project may have any number of datasets.
     if is_cloud() and current_count >= max_datasets:
         raise DatasetLimitExceeded(
@@ -513,7 +520,8 @@ def update_dataset(
     )
 
     changed_fields: list[str] = []
-    update_fields = ["updated_at"]
+    dataset.last_used_at = timezone.now()
+    update_fields = ["updated_at", "last_used_at"]
     if not isinstance(name, _Unset):
         if dataset.name != normalized_name:
             changed_fields.append("name")
@@ -545,7 +553,8 @@ def archive_dataset(*, team_id: int, dataset_id: UUID) -> DatasetMutationResult:
     if dataset.archived:
         return DatasetMutationResult(dataset=dataset)
     dataset.archived = True
-    dataset.save(update_fields=["archived", "updated_at"])
+    dataset.last_used_at = timezone.now()
+    dataset.save(update_fields=["archived", "updated_at", "last_used_at"])
     return DatasetMutationResult(dataset=dataset, changed_fields=("archived",))
 
 
@@ -555,7 +564,8 @@ def restore_dataset(*, team_id: int, dataset_id: UUID) -> DatasetMutationResult:
     if not dataset.archived:
         return DatasetMutationResult(dataset=dataset)
     dataset.archived = False
-    dataset.save(update_fields=["archived", "updated_at"])
+    dataset.last_used_at = timezone.now()
+    dataset.save(update_fields=["archived", "updated_at", "last_used_at"])
     return DatasetMutationResult(dataset=dataset, changed_fields=("archived",))
 
 
@@ -611,6 +621,7 @@ def create_dataset_item(
                     current_item_id=existing_item.id,
                 )
             if _item_contents_equal(_DatasetItemContent.from_version(current_version), content):
+                DatasetUsage.record(dataset, dataset.current_revision)
                 return DatasetItemMutationResult(
                     item=existing_item,
                     version=current_version,
@@ -691,6 +702,7 @@ def update_dataset_item(
     _validate_item_content(content=next_content)
 
     if _item_contents_equal(current_content, next_content):
+        DatasetUsage.record(dataset, dataset.current_revision)
         return DatasetItemMutationResult(
             item=item,
             version=current_version,
