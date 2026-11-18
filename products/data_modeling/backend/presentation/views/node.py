@@ -552,7 +552,7 @@ _READ_DENIED = "Reading data models requires data warehouse read access."
 
 
 # TODO: consolidate graph traversal logic. similar implementations exist in:
-# - posthog/temporal/data_modeling/workflows/execute_dag.py (_get_edge_lookup, _get_downstream_lookup)
+# - products/data_modeling/backend/temporal/workflows/execute_dag.py (_get_edge_lookup, _get_downstream_lookup)
 # - products/data_modeling/backend/graph.py (Graph) — shared in-memory graph used by list endpoint
 # the temporal workflow and lineage API should migrate to Graph
 
@@ -624,6 +624,18 @@ def _annotate_latest_job(queryset: models.QuerySet) -> models.QuerySet:
 
 def _node_queryset_with_latest_job() -> models.QuerySet:
     return _annotate_latest_job(Node.objects.select_related("saved_query", "dag").all())
+
+
+_LAST_RUN_FAILED = models.Q(_latest_job_status=DataModelingJob.Status.FAILED) | models.Q(
+    _latest_job_status__isnull=True, properties__system__last_run_status=DataModelingJob.Status.FAILED
+)
+_SERVING_SUSPENDED = models.Q(properties__system__suspended__has_key=DataModelingJobEngine.CLICKHOUSE)
+
+
+class NodeAttentionCountSerializer(serializers.Serializer):
+    count = serializers.IntegerField(
+        help_text="Models whose last serving run failed or whose scheduled runs are suspended, each counted once."
+    )
 
 
 class LineageResponseSerializer(serializers.Serializer):
@@ -943,6 +955,14 @@ class NodeViewSet(
         return response.Response(
             LineageResponseSerializer({"nodes": nodes, "edges": edges}, context=self.get_serializer_context()).data
         )
+
+    @extend_schema(responses={200: NodeAttentionCountSerializer})
+    @action(methods=["GET"], detail=False, pagination_class=None)
+    def attention_count(self, req: request.Request, *args, **kwargs) -> response.Response:
+        """How many of the models the list shows have failed their last run or are suspended."""
+        self._require_warehouse_access(level="viewer", message=_READ_DENIED)
+        count = self.get_queryset().filter(_LAST_RUN_FAILED | _SERVING_SUSPENDED).count()
+        return response.Response(NodeAttentionCountSerializer({"count": count}).data)
 
     @extend_schema(
         request=None,

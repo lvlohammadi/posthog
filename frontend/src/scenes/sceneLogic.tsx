@@ -226,9 +226,10 @@ function isProjectAccessDenied(sceneId: string, pathname: string, isCurrentProje
     return isCurrentProjectAccessDenied && !isAccountSettingsPath(pathname)
 }
 
-function isCloudOnlySceneOnSelfHosted(_sceneId: string | null): boolean {
-    // Self-hosted, single-tenant fork: no scene is hidden because upstream marks it Cloud only.
-    return false
+// `isHobby` is true until preflight loads, so a cloud user must not be redirected before it loads
+function isCloudOnlySceneOnSelfHosted(sceneId: string | null): boolean {
+    const { preflight, isHobby } = preflightLogic.values
+    return !!sceneId && !!sceneConfigurations[sceneId]?.cloudOnly && !!preflight && isHobby
 }
 
 function isFirstProjectWithoutData(user: UserType): boolean {
