@@ -582,6 +582,7 @@ sudo rm -f /data/backups/pre-deploy.dump && sudo docker image prune -f
 - **A slow registry has a fast detour.** `ghcr.io` ran at about 1 MB/s from the VM while Docker Hub ran at about 23 MB/s. The `mirror-ghcr.yml` workflow in the builder repo copies any image to `ghcr.io` or to Docker Hub on GitHub's side, with no download to a machine. Mirror to Docker Hub when the source is slow, pull from there, and tag the image with the name the compose file uses.
 - **Object storage keys moved into `.env`.** The hobby compose file requires `OBJECT_STORAGE_ACCESS_KEY_ID` and `OBJECT_STORAGE_SECRET_ACCESS_KEY`, and a missing value stops `up`. Generate both once, keep them out of logs and commits, and test a write and a read after the swap.
 - **GitHub over SSH can be blocked from the Mac.** The push then goes over HTTPS with `gh` as the credential helper, which has the `workflow` scope that the stored HTTPS token lacks.
+- **Set `OIDC_RSA_PRIVATE_KEY` on a new install.** Without it PostHog starts and serves everything except OAuth, and the only sign is a startup warning. The value is a PEM key on one line with literal `\n`, and the compose files do not pass it, so the server override must.
 
 ## Operational notes
 
@@ -766,5 +767,7 @@ Do not write hostnames, IP addresses, ports or account names into tracked files.
   - Checked and left alone: the persons delete throttles, the external account create throttles and the code verification resend throttle (they protect the API and sign-in from abuse, not model calls). The LLM analytics dataset cap of 100 (row 27 already skips it off Cloud).
   - New migrations: 41 across `posthog` (`1446` to `1451`), `ee` and products. ClickHouse: `0387` to `0391`.
   - Compose and image changes the server needs: `docker-compose.base.yml` moves the default ClickHouse image to a new PostHog build (the server pins its own version in `.env`, so no change) and sets `LOGS_REDIS_TLS` and `TRACES_REDIS_TLS` to false. The hobby compose file has no change. The Dockerfile adds `tini`. The checkout gains a new ClickHouse UDF version (`v13`) and a rebuilt UDF binary, so update it before a deploy.
-  - Built `sync-20261121-87fb14982e2` (also `:selfhost`, digest `sha256:0e139c1b211c`) on GitHub. Not deployed yet.
+  - Built `sync-20261121-87fb14982e2` (also `:selfhost`, digest `sha256:0e139c1b211c`) on GitHub.
+  - Deployed on 2026-11-21. The new base compose file replaced the server copy (the hobby file was already the same), the checkout moved to `master` for the new ClickHouse UDF, and every image came from Docker Hub: the app image directly, and the Rust and Node images through Docker Hub copies made by the mirror workflow, which now runs one queue per image so copies run side by side. All pulls took about 6.5 minutes. `db`, ClickHouse, Kafka, Redis, object storage and Temporal were not recreated. `web` answered 302 about 8 minutes after the recreate, with no Django migration left and ClickHouse migrations `0387` to `0391` applied.
+  - `OIDC_RSA_PRIVATE_KEY` was never set on this instance, so OAuth clients (MCP clients, dynamic client registration and the toolbar sign-in) could not be created. A 2048-bit key was generated on the server into `.env`, and the server override passes it to the app services. The startup warning is gone and `/.well-known/jwks.json` publishes the key.
 
