@@ -411,7 +411,8 @@ def _create_item_version(
     retained_versions = (
         DatasetItemVersion.objects.for_team(dataset.team_id, canonical=True).using(connection.alias).count()
     )
-    if retained_versions >= MAX_RETAINED_VERSIONS_PER_TEAM:
+    # Self-hosted, single-tenant fork: the retained dataset item version cap applies only on Cloud.
+    if is_cloud() and retained_versions >= MAX_RETAINED_VERSIONS_PER_TEAM:
         raise DatasetLimitExceeded(
             resource=DatasetConflictResponseResource.PROJECT_DATASET_ITEM_VERSIONS,
             current_count=retained_versions,

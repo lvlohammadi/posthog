@@ -7,6 +7,7 @@ from posthog.schema import EmptyPropertyFilter, EventPropertyFilter, PropertyGro
 
 from posthog.hogql.errors import BaseHogQLError
 
+from posthog.cloud_utils import is_cloud
 from posthog.dataclasses import frozen
 from posthog.models.scoping.manager import resolve_effective_team_id
 from posthog.models.user import User
@@ -80,7 +81,8 @@ def create_issue_tag_rule(
                 "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
                 [f"error-tracking-issue-tag-rules:{canonical_team_id}"],
             )
-        if rules.count() >= MAX_ISSUE_TAG_RULES_PER_TEAM:
+        # Self-hosted, single-tenant fork: the tag rule cap applies only on Cloud.
+        if is_cloud() and rules.count() >= MAX_ISSUE_TAG_RULES_PER_TEAM:
             raise IssueTagRuleLimitError(f"A project can have at most {MAX_ISSUE_TAG_RULES_PER_TEAM} tag rules.")
         return rules.create(
             team_id=canonical_team_id,

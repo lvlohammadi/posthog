@@ -2,7 +2,7 @@ import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.db import OperationalError, connection, transaction
 from django.test import SimpleTestCase, TransactionTestCase
@@ -66,8 +66,9 @@ class TestMaxDatasetsForTeam(SimpleTestCase):
 
 
 class TestProjectVersionAllocation(TransactionTestCase):
+    @patch("products.ai_observability.backend.dataset_service.is_cloud", return_value=True)
     @patch("products.ai_observability.backend.dataset_service.MAX_RETAINED_VERSIONS_PER_TEAM", 1)
-    def test_concurrent_datasets_share_the_last_slot_only_within_their_project(self) -> None:
+    def test_concurrent_datasets_share_the_last_slot_only_within_their_project(self, _is_cloud: Mock) -> None:
         _, _, team = Organization.objects.bootstrap(None)
         _, _, other_team = Organization.objects.bootstrap(None)
         first = create_dataset(team=team, created_by=None, name="First")

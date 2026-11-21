@@ -181,7 +181,8 @@ class TestIssueTagRuleAPI(APIBaseTest):
         ] == [kept["id"]]
         assert list(ErrorTrackingIssueTag.objects.unscoped().values_list("id", flat=True)) == [kept_tag.id]
 
-    def test_create_rejects_a_rule_above_the_project_limit(self) -> None:
+    @patch("products.error_tracking.backend.logic.issue_tags.rules.is_cloud", return_value=True)
+    def test_create_rejects_a_rule_above_the_project_limit(self, _is_cloud: Any) -> None:
         ErrorTrackingIssueTagRule.objects.for_team(self.team.id).bulk_create(
             [
                 ErrorTrackingIssueTagRule(team=self.team, label=f"Rule {index}", filters={}, bytecode=[], order_key=0)

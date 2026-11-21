@@ -9,6 +9,7 @@ from rest_framework.response import Response
 
 from posthog.api.monitoring import monitor
 from posthog.api.routing import TeamAndOrgViewSetMixin
+from posthog.cloud_utils import is_cloud
 from posthog.event_usage import report_user_action
 from posthog.permissions import AccessControlPermission
 
@@ -127,7 +128,8 @@ class ClusteringJobViewSet(TeamAndOrgViewSetMixin, AccessControlViewSetMixin, vi
                 ClusteringConfig.objects.get_or_create(team_id=self.team_id)
                 ClusteringConfig.objects.select_for_update().get(team_id=self.team_id)
                 existing_count = ClusteringJob.objects.filter(team_id=self.team_id).select_for_update().count()
-                if existing_count >= MAX_JOBS_PER_TEAM:
+                # Self-hosted, single-tenant fork: the clustering job cap applies only on Cloud.
+                if is_cloud() and existing_count >= MAX_JOBS_PER_TEAM:
                     return Response(
                         {"detail": f"Maximum of {MAX_JOBS_PER_TEAM} clustering jobs per team."},
                         status=status.HTTP_400_BAD_REQUEST,

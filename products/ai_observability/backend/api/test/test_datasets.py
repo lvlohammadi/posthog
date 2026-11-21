@@ -1299,9 +1299,10 @@ class TestDatasetsApi(APIBaseTest):
             request=ANY,
         )
 
+    @patch("products.ai_observability.backend.dataset_service.is_cloud", return_value=True)
     @patch("products.ai_observability.backend.api.datasets.report_user_action")
     @patch("products.ai_observability.backend.dataset_service.MAX_RETAINED_VERSIONS_PER_TEAM", 2)
-    def test_project_quota_counts_retained_history_until_deleted(self, report_action: Mock) -> None:
+    def test_project_quota_counts_retained_history_until_deleted(self, report_action: Mock, _is_cloud: Mock) -> None:
         first = self._create_dataset("First")
         second = self._create_dataset("Second")
         item = self._create_item(first["id"])
