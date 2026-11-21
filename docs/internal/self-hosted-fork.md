@@ -766,5 +766,5 @@ Do not write hostnames, IP addresses, ports or account names into tracked files.
   - Checked and left alone: the persons delete throttles, the external account create throttles and the code verification resend throttle (they protect the API and sign-in from abuse, not model calls). The LLM analytics dataset cap of 100 (row 27 already skips it off Cloud).
   - New migrations: 41 across `posthog` (`1446` to `1451`), `ee` and products. ClickHouse: `0387` to `0391`.
   - Compose and image changes the server needs: `docker-compose.base.yml` moves the default ClickHouse image to a new PostHog build (the server pins its own version in `.env`, so no change) and sets `LOGS_REDIS_TLS` and `TRACES_REDIS_TLS` to false. The hobby compose file has no change. The Dockerfile adds `tini`. The checkout gains a new ClickHouse UDF version (`v13`) and a rebuilt UDF binary, so update it before a deploy.
-  - Not built or deployed yet.
+  - Built `sync-20261121-87fb14982e2` (also `:selfhost`, digest `sha256:0e139c1b211c`) on GitHub. Not deployed yet.
 
