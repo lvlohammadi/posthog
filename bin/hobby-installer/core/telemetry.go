@@ -1,7 +1,7 @@
 package core
 
 import (
-	"github.com/posthog/posthog-go"
+	"github.com/posthog/posthog-go/v2"
 )
 
 // Self-hosted fork: install telemetry is never sent. No client is created, so the
