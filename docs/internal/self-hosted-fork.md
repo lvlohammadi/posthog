@@ -585,6 +585,7 @@ sudo rm -f /data/backups/pre-deploy.dump && sudo docker image prune -f
 - **Object storage keys moved into `.env`.** The hobby compose file requires `OBJECT_STORAGE_ACCESS_KEY_ID` and `OBJECT_STORAGE_SECRET_ACCESS_KEY`, and a missing value stops `up`. Generate both once, keep them out of logs and commits, and test a write and a read after the swap.
 - **GitHub over SSH can be blocked from the Mac.** The push then goes over HTTPS with `gh` as the credential helper, which has the `workflow` scope that the stored HTTPS token lacks.
 - **Set `OIDC_RSA_PRIVATE_KEY` on a new install.** Without it PostHog starts and serves everything except OAuth, and the only sign is a startup warning. The value is a PEM key on one line with literal `\n`, and the compose files do not pass it, so the server override must.
+- **The image build can outgrow the GitHub runner.** Upstream builds on larger machines. When the frontend stage fails with `cannot allocate memory`, or the runner "lost communication", the cause is BuildKit building several heavy stages at once. The builder workflow adds swap and sets `max-parallelism = 2`; lower it to 1 before touching the Dockerfile.
 
 ## Operational notes
 
@@ -781,5 +782,6 @@ Do not write hostnames, IP addresses, ports or account names into tracked files.
   - Added row 39 (alert caps on the alerts platform and error tracking).
   - Checked and left alone: no new model-call throttle came in. The new Today support ticket row hides itself off Cloud (self-hosted has no PostHog support tickets).
   - New migrations: 12 Django migrations and ClickHouse `0392` to `0394`. Compose files and the Dockerfile have no change. The checkout gains `docker/clickhouse/users-dev.xml`, which the hobby compose does not mount.
+  - The first build ran out of memory on the GitHub runner in the frontend stage, and a retry with 16 GB of swap thrashed until the runner stopped answering. The builder workflow now adds 16 GB of swap and caps BuildKit at two stages at a time (`max-parallelism = 2`); the Dockerfile stays as upstream has it. Built `sync-20261124-8fb05a3e7ef` (also `:selfhost`, digest `sha256:2bc52051d945`) on GitHub in 36 minutes.
   - Not deployed yet.
 
