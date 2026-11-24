@@ -55,6 +55,8 @@ DEFAULT_MAX_TRAINING_RUNS_PER_DAY = 3
 DEFAULT_MAX_ITERATIONS_PER_RUN = 10
 DEFAULT_MAX_LIVE_PIPELINES = 3
 DEFAULT_MAX_TRAINING_SPEND_USD_PER_MONTH = 100
+# Self-hosted, single-tenant fork: the value that stands for no limit off Cloud.
+_UNCAPPED_OFF_CLOUD = 2**31 - 1
 
 TEAM_CONFIG_MAX_TRAINING_RUNS_PER_DAY = "max_training_runs_per_day"
 TEAM_CONFIG_MAX_ITERATIONS_PER_RUN = "max_iterations_per_run"
@@ -164,6 +166,10 @@ def limits_for_team(team_id: int) -> TeamLimits:
         DEFAULT_MAX_TRAINING_SPEND_USD_PER_MONTH,
         minimum=0,
     )
+    # Self-hosted, single-tenant fork: training runs, live pipelines and spend are not capped off Cloud
+    # unless a payload sets them. The iteration bound per run stays, because it keeps one run from looping without end.
+    if payload is None and not is_cloud():
+        training_runs = live_pipelines = spend = _UNCAPPED_OFF_CLOUD
     return TeamLimits(
         max_training_runs_per_day=training_runs,
         max_iterations_per_run=iterations,

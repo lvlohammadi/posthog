@@ -213,8 +213,11 @@ class TestBillingManager(BaseTest):
         }
         assert response["usage_summary"]["period"] == ["2022-10-07T11:12:48", "2022-11-07T11:12:48"]
 
+    @patch("ee.billing.billing_manager.is_cloud", return_value=True)
     @patch("ee.billing.billing_manager.http_session.get")
-    def test_get_billing_read_only_writes_nothing_to_the_organization_or_license(self, mock_get: MagicMock):
+    def test_get_billing_read_only_writes_nothing_to_the_organization_or_license(
+        self, mock_get: MagicMock, _is_cloud: MagicMock
+    ):
         license = super(LicenseManager, cast(LicenseManager, License.objects)).create(
             key="key123::key123",
             plan="enterprise",

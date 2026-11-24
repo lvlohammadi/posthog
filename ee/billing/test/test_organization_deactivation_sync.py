@@ -47,6 +47,9 @@ class TestBuildBillingSystemToken(BaseTest):
 class TestDeactivatedOrganizationsClient(BaseTest):
     def setUp(self):
         super().setUp()
+        is_cloud_patcher = patch("ee.billing.billing_manager.is_cloud", return_value=True)
+        is_cloud_patcher.start()
+        self.addCleanup(is_cloud_patcher.stop)
         self.license = _create_license()
 
     @patch(

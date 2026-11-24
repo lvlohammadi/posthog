@@ -58,10 +58,13 @@ class TestLimitsForTeam(SimpleTestCase):
         with capture_logs() as logs:
             limits = self._limits({}, cloud=cloud)
 
+        # Self-hosted, single-tenant fork: with no payload, runs, live pipelines and spend are uncapped off Cloud.
+        uncapped = 2**31 - 1
         assert limits == TeamLimits(
-            max_training_runs_per_day=DEFAULT_MAX_TRAINING_RUNS_PER_DAY,
+            max_training_runs_per_day=DEFAULT_MAX_TRAINING_RUNS_PER_DAY if cloud else uncapped,
             max_iterations_per_run=DEFAULT_MAX_ITERATIONS_PER_RUN,
-            max_live_pipelines=DEFAULT_MAX_LIVE_PIPELINES,
+            max_live_pipelines=DEFAULT_MAX_LIVE_PIPELINES if cloud else uncapped,
+            **({} if cloud else {"max_training_spend_usd_per_month": uncapped}),
             sources=LimitSources(),
         )
         warnings = [log for log in logs if log["event"] == "autoresearch_limits_payload_missing"]
