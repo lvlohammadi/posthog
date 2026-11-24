@@ -792,5 +792,5 @@ Do not write hostnames, IP addresses, ports or account names into tracked files.
   - Checked and left alone: the dashboard v2 query batch limits per organization and per user (they bound concurrent query load), the Sentry migration and notebook app query throttles (API and query load), and a Cloud-only field on the signup profile step.
   - New migrations: 9 Django migrations and ClickHouse `0395`. The Dockerfile has no change.
   - Compose changes the server copy needs: `docker-compose.hobby.yml` adds a `cyclotron-node-migrate` service (`ghcr.io/posthog/posthog/sqlx-migrate:master`, a one-shot migration of the `cyclotron_node` database), gives the Node services `CYCLOTRON_NODE_DATABASE_URL`, the personhog settings and `UV_THREADPOOL_SIZE`, and names the Node image through `NODE_IMAGES_REGISTRY_URL`. Mirror the new image to Docker Hub before the deploy.
-  - Not deployed yet.
+  - Built `sync-20261124-09634c7580e` (also `:selfhost`, digest `sha256:897e8b1956f2`) on GitHub; the tag carries the UTC date of the build. The new `sqlx-migrate` image is copied to Docker Hub as `mirror-sqlx-migrate:master`. Not deployed yet.
 
