@@ -459,6 +459,100 @@ class BillingManager:
         # always unlocked, so there is nothing for billing to gate and nothing to fetch.
         return self._get_default_billing_response(organization)
 
+    def _build_billing_response(
+        self,
+        organization: Organization,
+        billing_service_response: BillingStatus,
+        *,
+        timeout: tuple[float, float] | None = None,
+    ) -> dict[str, Any]:
+        if not self.license:  # mypy
+            raise Exception("No license found")
+
+        response: dict[str, Any] = {"available_product_features": []}
+
+        response["license"] = {"plan": self.license.plan}
+
+        response.update(billing_service_response["customer"])
+
+        if not billing_service_response["customer"].get("products"):
+            products = self.get_default_products(organization, timeout=timeout)
+            response["products"] = products["products"]
+
+        response["stripe_portal_url"] = f"{settings.SITE_URL}/api/billing/portal"
+
+        usage_summary = response.get("usage_summary") or {}
+        if organization.usage:
+            for usage_key, usage in usage_summary.items():
+                # both dicts carry non-usage entries, e.g. "period" is a list
+                org_usage = organization.usage.get(usage_key)
+                if not isinstance(org_usage, dict) or not isinstance(usage, dict):
+                    continue
+                todays_usage = org_usage.get("todays_usage")
+                if todays_usage is not None:
+                    usage["todays_usage"] = todays_usage
+
+        # Extend the products with accurate usage_limit info
+        for product in response["products"]:
+            usage_key = product.get("usage_key")
+            if not usage_key:
+                continue
+            usage = response.get("usage_summary", {}).get(usage_key, {})
+            usage_limit = usage.get("limit")
+            billing_reported_usage = usage.get("usage") or 0
+            current_usage = billing_reported_usage
+
+            if usage.get("todays_usage"):
+                todays_usage = usage["todays_usage"]
+                current_usage = billing_reported_usage + todays_usage
+
+            product["current_usage"] = current_usage
+            product["percentage_usage"] = current_usage / usage_limit if usage_limit else 0
+
+        return response
+
+    def get_billing_read_only(
+        self,
+        organization: Organization | None,
+        query_params: dict[str, Any] | None = None,
+        *,
+        timeout: tuple[float, float] | None = None,
+    ) -> dict[str, Any]:
+        """Builds the response the way get_billing does, but from the stored organization and license.
+
+        It writes nothing, so a stored todays_usage or license plan that billing has moved past stays in the response.
+        """
+        # Self-hosted, single-tenant fork: never call the billing service, as in get_billing.
+        if not is_cloud():
+            return self._get_default_billing_response(organization, timeout=timeout)
+        if not organization:
+            return self._get_default_billing_response(organization, timeout=timeout)
+
+        billing_service_response = self._fetch_billing_status_with_customer(organization, query_params, timeout=timeout)
+        if billing_service_response is None:
+            return self._get_default_billing_response(organization, timeout=timeout)
+
+        return self._build_billing_response(organization, billing_service_response, timeout=timeout)
+
+    def _fetch_billing_status_with_customer(
+        self,
+        organization: Organization,
+        query_params: dict[str, Any] | None,
+        *,
+        timeout: tuple[float, float] | None,
+    ) -> BillingStatus | None:
+        if not self.license or not self.license.is_v2_license:
+            return None
+
+        # Get billing info from billing service
+        billing_service_response = self._get_billing(organization, query_params, timeout=timeout)
+
+        customer = cast(dict[str, Any], billing_service_response).get("customer")
+        if not customer:
+            return None
+
+        return billing_service_response
+
     def update_billing(
         self, organization: Organization, data: dict[str, Any], authorizer_actor: Optional[User] = None
     ) -> requests.Response:
@@ -1171,6 +1265,9 @@ class BillingManager:
         return res.json()
 
     def open_external_credit_pool(self, organization: Organization, *, grant_id: str, cents: int, day: str) -> None:
+        # Self-hosted, single-tenant fork: never call the billing service.
+        if not is_cloud():
+            return
         res = http_session.post(
             f"{BILLING_SERVICE_URL}/api/rated-usage/external-credit-pools",
             headers=self.get_auth_headers(organization, service_action="rated_usage"),
@@ -1183,6 +1280,9 @@ class BillingManager:
             raise ValueError("Billing did not accept the external credit pool")
 
     def record_rated_usage(self, organization: Organization, items: list[RatedUsageItem]) -> None:
+        # Self-hosted, single-tenant fork: never call the billing service.
+        if not is_cloud():
+            return
         res = http_session.post(
             f"{BILLING_SERVICE_URL}/api/rated-usage",
             headers=self.get_auth_headers(organization, service_action="rated_usage"),
@@ -1211,6 +1311,9 @@ class BillingManager:
         404 (endpoint not deployed) and 401 (auth failure) as success, so the caller would
         record a sync that never happened, hence the explicit (200,).
         """
+        # Self-hosted, single-tenant fork: never call the billing service.
+        if not is_cloud():
+            return {}
         res = http_session.post(
             f"{BILLING_SERVICE_URL}/api/internal/deactivated-organizations",
             headers=self._system_auth_headers(DEACTIVATED_ORGANIZATIONS_SERVICE_ACTION),
@@ -1224,6 +1327,9 @@ class BillingManager:
 
     def get_deactivated_organizations(self) -> list[str]:
         """Organization ids billing currently excludes from the revenue forecast."""
+        # Self-hosted, single-tenant fork: never call the billing service.
+        if not is_cloud():
+            return []
         res = http_session.get(
             f"{BILLING_SERVICE_URL}/api/internal/deactivated-organizations",
             headers=self._system_auth_headers(DEACTIVATED_ORGANIZATIONS_SERVICE_ACTION),
