@@ -252,7 +252,8 @@ class TestErrorTrackingAlerts(APIBaseTest):
         assert response.status_code == 400, response.json()
         assert ErrorTrackingAlert.objects.for_team(self.team.id).count() == 0
 
-    def test_alert_limits_destinations_per_alert_and_alerts_per_team(self):
+    @patch("products.error_tracking.backend.logic.alerts.is_cloud", return_value=True)
+    def test_alert_limits_destinations_per_alert_and_alerts_per_team(self, _is_cloud):
         integration = self._create_slack_integration()
         destinations = [
             {"channel_type": "slack", "integration_id": integration.id, "config": {"channel": f"C{i}"}}

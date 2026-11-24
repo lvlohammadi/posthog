@@ -16,6 +16,7 @@ from django.utils import timezone as django_timezone
 
 from pydantic import ValidationError as PydanticValidationError
 
+from posthog.cloud_utils import is_cloud
 from posthog.exceptions_capture import capture_exception
 from posthog.models.activity_logging.model_activity import get_current_user, get_was_impersonated
 from posthog.models.signals import model_activity_signal
@@ -148,6 +149,9 @@ def _admit(
     if spec is None:
         return
     cap = spec.native.max_per_team if spec.native is not None and current is None else None
+    # Self-hosted, single-tenant fork: the per-team cap on a source's alerts applies only on Cloud.
+    if not is_cloud():
+        cap = None
     if spec.admit is None and cap is None:
         return
     hold_cap_lock(team_id, source_kind)

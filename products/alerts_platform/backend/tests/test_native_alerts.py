@@ -204,7 +204,10 @@ class TestNativeAlerts(ClickhouseTestMixin, APIBaseTest):
                 )
             assert PlatformAlertConfiguration.objects.get(id=copy.id).snooze_until == (None if mirrored else until)
 
-    def test_admission_refuses_a_create_past_the_cap_and_sees_an_edit_that_turns_the_alert_on(self) -> None:
+    @patch("products.alerts_platform.backend.logic.platform_writes.is_cloud", return_value=True)
+    def test_admission_refuses_a_create_past_the_cap_and_sees_an_edit_that_turns_the_alert_on(
+        self, _is_cloud: MagicMock
+    ) -> None:
         admitted: list[tuple[bool, bool, int | None]] = []
 
         def admit(

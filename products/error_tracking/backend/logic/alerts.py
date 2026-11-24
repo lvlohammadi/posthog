@@ -8,6 +8,7 @@ from django.db.models import QuerySet
 
 import structlog
 
+from posthog.cloud_utils import is_cloud
 from posthog.integrations import IntegrationManager
 from posthog.models.scoping.manager import resolve_effective_team_id
 from posthog.models.team.team import Team
@@ -105,7 +106,8 @@ def create_alert(
         # Serializes concurrent creates for the team so the cap holds; the lock ends with the transaction.
         with connection.cursor() as cursor:
             cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", [f"error_tracking_alerts:{team_id}"])
-        if ErrorTrackingAlert.objects.for_team(team_id, canonical=True).count() >= MAX_ALERTS_PER_TEAM:
+        # Self-hosted, single-tenant fork: the error tracking alert cap applies only on Cloud.
+        if is_cloud() and ErrorTrackingAlert.objects.for_team(team_id, canonical=True).count() >= MAX_ALERTS_PER_TEAM:
             raise AlertValidationError(f"A project can have at most {MAX_ALERTS_PER_TEAM} alerts.")
         alert = ErrorTrackingAlert.objects.for_team(team_id, canonical=True).create(
             team_id=team_id,
