@@ -61,6 +61,7 @@ from webauthn.helpers.structs import AuthenticatorTransport, PublicKeyCredential
 from posthog.api.email_verification import email_verification_code_verifier, is_email_verification_disabled
 from posthog.auth import ACCOUNT_BLOCKED_DETAIL
 from posthog.caching.login_device_cache import check_and_cache_login_device
+from posthog.cloud_utils import is_cloud
 from posthog.constants import AUTH_BACKEND_DISPLAY_NAMES, POSTHOG_INTERNAL_EMAIL_SUFFIX
 from posthog.dataclasses import frozen
 from posthog.email import EmailRecipientUndeliverableError, is_email_available
@@ -1851,6 +1852,9 @@ def social_require_idp_email_verification(
     if _sso_reauth_request(strategy):
         if user is None or not UserSocialAuth.objects.filter(user=user, provider=backend.name, uid=uid).exists():
             raise AuthFailed(backend, "reauth_user_mismatch")
+        return None
+    # Self-hosted, single-tenant fork: with no email configured, an identity provider login skips the emailed proof.
+    if not is_cloud() and not is_email_available(with_absolute_urls=True):
         return None
     identity = _identity_provider_identity(backend, details, response)
     email = ((details or {}).get("email") or "").strip().lower()

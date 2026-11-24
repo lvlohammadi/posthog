@@ -33,6 +33,7 @@ from posthog.api.webauthn import (
     WEBAUTHN_SIGNUP_EMAIL_KEY,
     WEBAUTHN_SIGNUP_USER_UUID_KEY,
 )
+from posthog.cloud_utils import is_cloud
 from posthog.email import is_email_available
 from posthog.event_usage import alias_invite_id, report_user_joined_organization, report_user_signed_up
 from posthog.exceptions_capture import capture_exception
@@ -971,7 +972,8 @@ class SocialSignupSerializer(serializers.Serializer):
                 partial.backend in IDP_SSO_BACKENDS
                 and not idp_authentication_is_fresh(partial.data.get("kwargs", {}).get("idp_authenticated_at"))
             )
-            or (partial.backend in IDP_SSO_BACKENDS and not is_email_available(with_absolute_urls=True))
+            # Self-hosted, single-tenant fork: with no email configured, an identity provider signup needs no emailed proof.
+            or (partial.backend in IDP_SSO_BACKENDS and is_cloud() and not is_email_available(with_absolute_urls=True))
         ):
             raise serializers.ValidationError("Please log in again to verify your email.")
 

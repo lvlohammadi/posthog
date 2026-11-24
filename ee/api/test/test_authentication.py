@@ -93,6 +93,10 @@ CURRENT_FOLDER = os.path.dirname(__file__)
 class TestOIDCAuthentication(APILicensedTest):
     def setUp(self):
         super().setUp()
+        for target in ("posthog.api.authentication.is_cloud", "posthog.api.signup.is_cloud"):
+            patcher = patch(target, return_value=True)
+            patcher.start()
+            self.addCleanup(patcher.stop)
         self.organization.available_product_features = [
             {"key": AvailableFeature.OIDC, "name": "OIDC"},
             {"key": AvailableFeature.SSO_ENFORCEMENT, "name": "SSO enforcement"},
@@ -1588,6 +1592,13 @@ class TestEELoginPrecheckAPI(APILicensedTest):
 
 
 class TestEEAuthenticationAPI(APILicensedTest):
+    def setUp(self):
+        super().setUp()
+        for target in ("posthog.api.authentication.is_cloud", "posthog.api.signup.is_cloud"):
+            patcher = patch(target, return_value=True)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
     CONFIG_EMAIL = "user7@posthog.com"
 
     def create_enforced_domain(self, **kwargs) -> OrganizationDomain:
@@ -2284,6 +2295,13 @@ class TestEEAuthenticationAPI(APILicensedTest):
 @pytest.mark.skip_on_multitenancy
 @override_settings(**SAML_MOCK_SETTINGS)
 class TestEESAMLAuthenticationAPI(APILicensedTest):
+    def setUp(self):
+        super().setUp()
+        for target in ("posthog.api.authentication.is_cloud", "posthog.api.signup.is_cloud"):
+            patcher = patch(target, return_value=True)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
     CONFIG_AUTO_LOGIN = False
     organization_domain: OrganizationDomain = None  # type: ignore
 
